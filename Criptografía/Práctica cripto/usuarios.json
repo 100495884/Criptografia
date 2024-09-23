@@ -1,0 +1,18 @@
+{
+    "nabo": {
+        "salt": "Rz9ohSTFISGjm3WxRVHlJw==",
+        "hashed_password": "bIXCdSEFldTL53qYCwccOD5r4fvo9P1zw69kaG0k1Rs="
+    },
+    "culloo": {
+        "salt": "HUYN_X8AGL39pmVeMmM3Yw==",
+        "hashed_password": "BT7PrUTlC4PCnpOGvzF9vLXfYUkA9vdHEiPideXbeF0="
+    },
+    "alberto": {
+        "salt": "YbwDFwD1cOstrGvnids7yQ==",
+        "hashed_password": "ZVLGkVnvlqrRFb5cJflsS239LLL-wjxcSjQm_-kUO5I="
+    },
+    "1": {
+        "salt": "TUstqb5-h6tb2O6-7aX5Qw==",
+        "hashed_password": "65QLW5Nts6fcxwmvJzLtYXLg2HoEhw1hDavOBvp2q9s="
+    }
+}
