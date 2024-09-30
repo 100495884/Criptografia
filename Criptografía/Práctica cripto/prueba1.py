@@ -1,12 +1,17 @@
 import os
 import base64
+import hashlib
 import json
 import re
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk
 
 # Archivo donde se almacenarán los datos de los usuarios
 ARCHIVO_USUARIOS = "usuarios.json"
@@ -42,6 +47,54 @@ def verificar_password(password, salt, hashed_password):
     except:
         return False
 
+
+# =====================
+# FUNCIONES DE RESTAURACIÓN DE CONTRASEÑA
+# =====================
+def validar_email(email):
+    """
+    Verifica si el correo electrónico es válido y pertenece al dominio de Gmail (.com o .es).
+    """
+    patron = r'^[a-zA-Z0-9._%+-]+@gmail\.(com|es)$'
+    # Usamos re.fullmatch para que toda la cadena se verifique y no solo una parte.
+    return bool(re.fullmatch(patron, email))
+
+
+def restaurar_contraseña(nombre_usuario, email):
+    intentos = 0
+    while intentos < 3:
+        if not validar_email(email):
+            intentos += 1
+            raise ValidationError("El correo electrónico debe tener una forma válida.")
+
+        # Configuración del servidor de correo
+        servidor_correo = "smtp.gmail.com"
+        puerto = 587
+        correo_envio = "100495692@alumnos.uc3m.es"
+        contraseña_correo = "miep iewr zlmc ycfp"
+
+        # Creación del mensaje
+        mensaje = MIMEMultipart()
+        mensaje['From'] = correo_envio
+        mensaje['To'] = email
+        mensaje['Subject'] = "Restauración de contraseña"
+        cuerpo_mensaje = f"Hola {nombre_usuario},\n\nPara restablecer tu contraseña, por favor sigue este enlace: http://tu_sitio_web.com/restablecer_contraseña/{nombre_usuario}\n\nSi no has solicitado un restablecimiento de contraseña, por favor ignora este correo."
+        mensaje.attach(MIMEText(cuerpo_mensaje, 'plain'))
+
+        # Conexión al servidor de correo y envío del mensaje
+        try:
+            servidor = smtplib.SMTP(servidor_correo, puerto)
+            servidor.starttls()
+            servidor.login(correo_envio, contraseña_correo)
+            servidor.send_message(mensaje)
+            servidor.quit()
+            return True
+        except smtplib.SMTPException as e:
+            raise ValidationError(f"Error al enviar el correo electrónico: {e}")
+
+    raise ValidationError("Has excedido el número de intentos para ingresar un correo válido.")
+
+
 # =====================
 # FUNCIONES PARA GESTIONAR EL ARCHIVO JSON
 # =====================
@@ -66,30 +119,30 @@ def validar_nombre_usuario(nombre_usuario):
         raise ValidationError("El nombre de usuario no debe contener caracteres especiales.")
     if len(nombre_usuario) > 15:
         raise ValidationError("El nombre de usuario no debe tener más de 15 caracteres.")
+    if len(nombre_usuario) < 5:
+        raise ValidationError("El nombre de usuario no debe tener menos de 5 caracteres.")
     return True
 
 def validar_contraseña(password):
     if len(password) < 8:
         raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
-    if not re.search("[a-zA-Z]", password):
-        raise ValidationError("La contraseña debe contener al menos una letra.")
-    if not re.search("[0-9]", password):
-        raise ValidationError("La contraseña debe contener al menos un número.")
-    if not re.search("[\W]", password):
-        raise ValidationError("La contraseña debe contener al menos un carácter especial.")
+    if len(password) > 30:
+        raise ValidationError("La contraseña no debe tener más de 30 caracteres.")
+    if not re.search("^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\W]).{8,30}$", password):
+        raise ValidationError("La contraseña debe contener al menos una letra, un número y un carácter especial.")
     return True
 
 def registrar_usuario(nombre_usuario, password):
     usuarios = cargar_usuarios()
 
     if nombre_usuario in usuarios:
-        raise ValidationError(f"El usuario '{nombre_usuario}' ya existe.")
+        raise ValidationError(f"Error: El usuario '{nombre_usuario}' ya existe.")
 
     try:
         validar_nombre_usuario(nombre_usuario)
         validar_contraseña(password)
     except ValidationError as e:
-        return str(e)
+        raise e
 
     salt = generar_salt()
     hashed_password = hash_password(password, salt)
@@ -100,104 +153,324 @@ def registrar_usuario(nombre_usuario, password):
     }
 
     guardar_usuarios(usuarios)
-    return f"Usuario '{nombre_usuario}' registrado con éxito."
+    return True
 
 def autenticar_usuario(nombre_usuario, password):
     usuarios = cargar_usuarios()
-
     if nombre_usuario not in usuarios:
-        return f"Error: El usuario '{nombre_usuario}' no está registrado."
+        raise ValidationError(f"Error: El usuario '{nombre_usuario}' no está registrado.")
 
     user_data = usuarios[nombre_usuario]
     salt = base64.urlsafe_b64decode(user_data['salt'])
     hashed_password = user_data['hashed_password']
 
     if verificar_password(password, salt, hashed_password):
-        return f"Usuario '{nombre_usuario}' autenticado correctamente."
+        return True
     else:
-        return f"Error: Contraseña incorrecta para el usuario '{nombre_usuario}'."
+        raise ValidationError("Error: Contraseña incorrecta.")
+
+
+
 
 # =====================
 # INTERFAZ GRÁFICA
 # =====================
 class App:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Sistema de Autenticación")
+    def __init__(self, master):
+        self.master = master
+        master.title("Sistema de Registro y Autenticación")
+        master.geometry("400x300")
 
-        self.menú_frame = tk.Frame(self.root)
-        self.menú_frame.pack(padx=10, pady=10)
+        # Cambiar el color de fondo de la ventana
+        master.configure(bg="white")
 
-        self.boton_registrar = tk.Button(self.menú_frame, text="Registrarse", command=self.mostrar_formulario_registro)
-        self.boton_registrar.pack(fill='x')
+        # Estilo para botones
+        self.style = ttk.Style()
+        self.style.configure("TButton", padding=8, relief="flat", background="white", foreground="Black",
+                             font=("Helvetica", 12))
 
-        self.boton_iniciar_sesion = tk.Button(self.menú_frame, text="Iniciar sesión", command=self.mostrar_formulario_login)
-        self.boton_iniciar_sesion.pack(fill='x')
+        # Estilo para botones activos
+        self.style.map("TButton", background=[("active", "black")], foreground=[("active", "black")])
 
-        self.boton_salir = tk.Button(self.menú_frame, text="Salir", command=self.root.quit)
-        self.boton_salir.pack(fill='x')
 
-        self.formulario_frame = None
+        # Estilo para etiquetas
+        self.style.configure("TLabel", background="white", foreground="black", font=("Helvetica", 12))
 
-    def mostrar_formulario_registro(self):
-        self.limpiar_pantalla()
-        self.formulario_frame = tk.Frame(self.root)
-        self.formulario_frame.pack(padx=10, pady=10)
+        # Frame principal
 
-        tk.Label(self.formulario_frame, text="Nombre de usuario").grid(row=0, column=0)
-        self.entry_usuario = tk.Entry(self.formulario_frame)
-        self.entry_usuario.grid(row=0, column=1)
 
-        tk.Label(self.formulario_frame, text="Contraseña").grid(row=1, column=0)
-        self.entry_password = tk.Entry(self.formulario_frame, show='*')
-        self.entry_password.grid(row=1, column=1)
+        self.menu_frame = ttk.Frame(master)
+        self.menu_frame.pack(pady=20)
 
-        self.boton_registrar = tk.Button(self.formulario_frame, text="Registrarse", command=self.registrar_usuario_gui)
-        self.boton_registrar.grid(row=2, columnspan=2)
+        self.label = ttk.Label(self.menu_frame, text="Bienvenido al sistema")
+        self.label.pack(pady=(0, 20))
 
-        self.boton_volver = tk.Button(self.formulario_frame, text="Volver", command=self.volver_al_menu)
-        self.boton_volver.grid(row=3, columnspan=2)
+        self.boton_registrar = ttk.Button(self.menu_frame, text="Registrarse", command=self.mostrar_registro)
+        self.boton_registrar.pack(pady=5)
 
-    def mostrar_formulario_login(self):
-        self.limpiar_pantalla()
-        self.formulario_frame = tk.Frame(self.root)
-        self.formulario_frame.pack(padx=10, pady=10)
+        self.boton_autenticar = ttk.Button(self.menu_frame, text="Iniciar sesión", command=self.mostrar_login_usuario)
+        self.boton_autenticar.pack(pady=5)
 
-        tk.Label(self.formulario_frame, text="Nombre de usuario").grid(row=0, column=0)
-        self.entry_usuario = tk.Entry(self.formulario_frame)
-        self.entry_usuario.grid(row=0, column=1)
+        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=master.quit)
+        self.boton_salir.pack(pady=5)
 
-        tk.Label(self.formulario_frame, text="Contraseña").grid(row=1, column=0)
-        self.entry_password = tk.Entry(self.formulario_frame, show='*')
-        self.entry_password.grid(row=1, column=1)
+        # Inicializamos variables para mantener el estado
+        self.usuario_actual = None
 
-        self.boton_iniciar_sesion = tk.Button(self.formulario_frame, text="Iniciar sesión", command=self.iniciar_sesion_gui)
-        self.boton_iniciar_sesion.grid(row=2, columnspan=2)
+        # Frames para las diferentes pantallas
+        self.frame_registro = None
+        self.frame_login = None
+        self.frame_contraseña = None
+        self.frame_opciones = None
+        self.frame_cambiar_contraseña = None
+        self.frame_nueva_contraseña = None
 
-        self.boton_volver = tk.Button(self.formulario_frame, text="Volver", command=self.volver_al_menu)
-        self.boton_volver.grid(row=3, columnspan=2)
+    def limpiar_frame(self):
+        for widget in self.master.winfo_children():
+            widget.destroy()
 
-    def limpiar_pantalla(self):
-        if self.formulario_frame is not None:
-            self.formulario_frame.pack_forget()
+    def limpiar_login(self):
+        if self.frame_registro is not None:
+            self.frame_registro.pack_forget()
+        if self.frame_login is not None:
+            self.frame_login.pack_forget()
+        if self.frame_contraseña is not None:
+            self.frame_contraseña.pack_forget()
+        if self.frame_opciones is not None:
+            self.frame_opciones.pack_forget()
+        if self.frame_cambiar_contraseña is not None:
+            self.frame_cambiar_contraseña.pack_forget()
+        if self.frame_nueva_contraseña is not None:
+            self.frame_nueva_contraseña.pack_forget()
 
-    def volver_al_menu(self):
-        self.limpiar_pantalla()
-        self.menú_frame.pack(padx=10, pady=10)
+    def mostrar_registro(self):
+        self.limpiar_frame()
+        self.frame_registro = ttk.Frame(self.master)
+        self.frame_registro.pack(pady=20)
 
-    def registrar_usuario_gui(self):
+        self.label_usuario = ttk.Label(self.frame_registro, text="Nombre de usuario:")
+        self.label_usuario.pack()
+        self.entry_usuario = ttk.Entry(self.frame_registro)
+        self.entry_usuario.pack()
+
+        self.label_password = ttk.Label(self.frame_registro, text="Contraseña:")
+        self.label_password.pack()
+        self.entry_password = ttk.Entry(self.frame_registro, show='*')
+        self.entry_password.pack()
+
+        self.boton_registrar = ttk.Button(self.frame_registro, text="Registrar", command=self.registrar_usuario)
+        self.boton_registrar.pack(pady=5)
+
+        self.boton_volver = ttk.Button(self.frame_registro, text="Volver", command=self.volver_menu)
+        self.boton_volver.pack(pady=5)
+
+    def registrar_usuario(self):
         nombre_usuario = self.entry_usuario.get()
         password = self.entry_password.get()
-        resultado = registrar_usuario(nombre_usuario, password)
-        messagebox.showinfo("Registro", resultado)
 
-    def iniciar_sesion_gui(self):
-        nombre_usuario = self.entry_usuario.get()
-        password = self.entry_password.get()
-        resultado = autenticar_usuario(nombre_usuario, password)
-        messagebox.showinfo("Inicio de sesión", resultado)
+        try:
+            if registrar_usuario(nombre_usuario, password):
+                messagebox.showinfo("Éxito", "Usuario registrado exitosamente.")
+                self.volver_menu()
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
 
-# Crear la ventana principal y ejecutar la aplicación
+    def mostrar_login_usuario(self):
+        self.limpiar_frame()
+        self.frame_login = ttk.Frame(self.master)
+        self.frame_login.pack(pady=20)
+
+        self.label_usuario = ttk.Label(self.frame_login, text="Nombre de usuario:")
+        self.label_usuario.pack()
+        self.entry_usuario_login = ttk.Entry(self.frame_login)
+        self.entry_usuario_login.pack()
+
+        self.boton_confirmar = ttk.Button(self.frame_login, text="Continuar", command=self.mostrar_contraseña)
+        self.boton_confirmar.pack(pady=5)
+
+        self.boton_volver = ttk.Button(self.frame_login, text="Volver", command=self.volver_menu)
+        self.boton_volver.pack(pady=5)
+
+    def mostrar_contraseña(self):
+        self.usuario_actual = self.entry_usuario_login.get()
+
+        usuarios = cargar_usuarios()
+        if self.usuario_actual not in usuarios:
+            messagebox.showerror("Error", "El usuario no está registrado.")
+            return
+
+        self.limpiar_login()
+        self.frame_contraseña = ttk.Frame(self.master)
+        self.frame_contraseña.pack(pady=20)
+
+        self.label_password = ttk.Label(self.frame_contraseña, text="Contraseña:")
+        self.label_password.pack()
+        self.entry_password_login = ttk.Entry(self.frame_contraseña, show='*')
+        self.entry_password_login.pack()
+
+        self.boton_autenticar = ttk.Button(self.frame_contraseña, text="Iniciar sesión", command=self.autenticar_usuario)
+        self.boton_autenticar.pack(pady=5)
+
+        self.boton_olvidar = ttk.Button(self.frame_contraseña, text="Olvidé mi contraseña", command=lambda: self.mostrar_pantalla_restaurar_contraseña(self.usuario_actual))
+        self.boton_olvidar.pack(pady=5)
+
+        self.boton_volver = ttk.Button(self.frame_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver.pack(pady=5)
+
+    def autenticar_usuario(self):
+        nombre_usuario = self.usuario_actual
+        password = self.entry_password_login.get()
+
+        try:
+            if autenticar_usuario(nombre_usuario, password):
+                messagebox.showinfo("Éxito", f"Ingreso exitoso como {nombre_usuario}.")
+                self.mostrar_opciones()
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+
+        # Función para mostrar la pantalla de recuperación de contraseña
+
+    def mostrar_pantalla_restaurar_contraseña(self, nombre_usuario):
+        self.limpiar_login()
+        self.frame_restaurar_contraseña = ttk.Frame(self.master)
+        self.frame_restaurar_contraseña.pack(pady=20)
+
+        self.label_email = ttk.Label(self.frame_restaurar_contraseña, text="Ingresa tu correo electrónico:")
+        self.label_email.pack()
+        self.entry_email = ttk.Entry(self.frame_restaurar_contraseña)
+        self.entry_email.pack()
+
+        self.boton_enviar = ttk.Button(self.frame_restaurar_contraseña, text="Enviar",
+                                       command=lambda: self.enviar_correo_restauracion(nombre_usuario))
+        self.boton_enviar.pack(pady=5)
+
+        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver.pack(pady=5)
+
+        # Función para enviar el correo de restauración
+
+    def enviar_correo_restauracion(self, nombre_usuario):
+        email = self.entry_email.get()
+        try:
+            if restaurar_contraseña(nombre_usuario, email):
+                messagebox.showinfo("Éxito", "Correo de restauración enviado exitosamente.")
+                self.volver_menu()
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+
+
+    def mostrar_opciones(self):
+        self.limpiar_login()
+        self.frame_opciones = ttk.Frame(self.master)
+        self.frame_opciones.pack(pady=20)
+
+        self.label_opciones = ttk.Label(self.frame_opciones, text="Opciones:")
+        self.label_opciones.pack()
+
+        self.boton_cambiar_contraseña = ttk.Button(self.frame_opciones, text="Cambiar contraseña", command=self.mostrar_cambiar_contraseña)
+        self.boton_cambiar_contraseña.pack(pady=5)
+
+        self.boton_salir = ttk.Button(self.frame_opciones, text="Salir", command=self.master.quit)
+        self.boton_salir.pack(pady=5)
+
+    def mostrar_cambiar_contraseña(self):
+        self.limpiar_login()
+
+        self.frame_cambiar_contraseña = ttk.Frame(self.master)
+        self.frame_cambiar_contraseña.pack(pady=20)
+
+        self.label_actual = ttk.Label(self.frame_cambiar_contraseña, text="Contraseña actual:")
+        self.label_actual.pack()
+        self.entry_actual = ttk.Entry(self.frame_cambiar_contraseña, show='*')
+        self.entry_actual.pack()
+
+        self.boton_confirmar_cambio = ttk.Button(self.frame_cambiar_contraseña, text="Continuar", command=self.verificar_contraseña_actual)
+        self.boton_confirmar_cambio.pack(pady=5)
+
+        self.boton_volver_cambiar = ttk.Button(self.frame_cambiar_contraseña, text="Volver", command=self.mostrar_opciones)
+        self.boton_volver_cambiar.pack(pady=5)
+
+    def verificar_contraseña_actual(self):
+        usuarios = cargar_usuarios()
+        nombre_usuario = self.usuario_actual
+        password_actual = self.entry_actual.get()
+
+        salt = base64.urlsafe_b64decode(usuarios[nombre_usuario]['salt'])
+        hashed_password = usuarios[nombre_usuario]['hashed_password']
+
+        if verificar_password(password_actual, salt, hashed_password):
+            self.mostrar_nueva_contraseña()
+        else:
+            messagebox.showerror("Error", "La contraseña actual es incorrecta.")
+
+    def mostrar_nueva_contraseña(self):
+        self.limpiar_login()
+        self.frame_nueva_contraseña = ttk.Frame(self.master)
+        self.frame_nueva_contraseña.pack(pady=20)
+
+        self.label_nueva = ttk.Label(self.frame_nueva_contraseña, text="Nueva contraseña:")
+        self.label_nueva.pack()
+        self.entry_nueva = ttk.Entry(self.frame_nueva_contraseña, show='*')
+        self.entry_nueva.pack()
+
+        self.label_confirmar = ttk.Label(self.frame_nueva_contraseña, text="Confirmar nueva contraseña:")
+        self.label_confirmar.pack()
+        self.entry_confirmar = ttk.Entry(self.frame_nueva_contraseña, show='*')
+        self.entry_confirmar.pack()
+
+        self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña)
+        self.boton_confirmar_nueva.pack(pady=5)
+
+        self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.mostrar_opciones)
+        self.boton_volver_nueva.pack(pady=5)
+
+    def cambiar_contraseña(self):
+        usuarios = cargar_usuarios()
+        nombre_usuario = self.usuario_actual
+        nueva_password = self.entry_nueva.get()
+        confirmar_password = self.entry_confirmar.get()
+
+        try:
+            # Validar que las nuevas contraseñas coincidan
+            if nueva_password != confirmar_password:
+                messagebox.showerror("Error", "Las nuevas contraseñas no coinciden.")
+                return
+
+            # Validar la nueva contraseña usando la misma lógica de registro
+            validar_contraseña(nueva_password)
+
+            # Si la validación es exitosa, continuar con el cambio de contraseña
+            salt = base64.urlsafe_b64decode(usuarios[nombre_usuario]['salt'])
+            hashed_nueva_password = hash_password(nueva_password, salt)
+
+            usuarios[nombre_usuario]['hashed_password'] = hashed_nueva_password.decode('utf-8')
+            guardar_usuarios(usuarios)
+            messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
+            self.mostrar_opciones()  # Volver al menú de opciones después de cambiar la contraseña
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+
+    def volver_menu(self):
+        self.limpiar_frame()
+        self.menu_frame = ttk.Frame(self.master)
+        self.menu_frame.pack(pady=20)
+
+        self.label = ttk.Label(self.menu_frame, text="Bienvenido al sistema")
+        self.label.pack()
+
+        self.boton_registrar = ttk.Button(self.menu_frame, text="Registrarse", command=self.mostrar_registro)
+        self.boton_registrar.pack(pady=5)
+
+        self.boton_autenticar = ttk.Button(self.menu_frame, text="Iniciar sesión",
+                                           command=self.mostrar_login_usuario)
+        self.boton_autenticar.pack(pady=5)
+
+        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=self.master.quit)
+        self.boton_salir.pack(pady=5)
+
+# =====================
+# EJECUCIÓN DE LA APLICACIÓN
+# =====================
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)

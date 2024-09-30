@@ -1,3 +1,38 @@
 {
-
+    "trjnj": {
+        "salt": "I5x4bu8URNQ4Jt9o9kEGsA==",
+        "hashed_password": "3ZzEE3ox6cPKNCw3c91o5XaSSEGVvXqVkBoc55MoY5c="
+    },
+    "trjnjk": {
+        "salt": "RzfG0-OavvoZWwRSb4zotQ==",
+        "hashed_password": "ydA1Mu_N7f8gbLpJppPnnfa-_k__j3cpitmlDsnV4hI="
+    },
+    "carlos": {
+        "salt": "UunLa6LuytXVGdzjMr6cdw==",
+        "hashed_password": "5PK0tGOsWITQ0EOjAxiuAAlfmCQusntqPLPw5-WA_ws="
+    },
+    "josecarlos": {
+        "salt": "2XuAkil7tcT9bbMJ6wd0Gw==",
+        "hashed_password": "Qe6E_BmShByJPiHpFM_WXECscVCE2EoWajhD_NAhoKo="
+    },
+    "julian": {
+        "salt": "umLI2n8A0ZKxj8qwgB7dmg==",
+        "hashed_password": "myGkt5ARsl8QdBGjhutWATkHjBD7EREjh8_nlZ6LTOk="
+    },
+    "grgrgr": {
+        "salt": "OQ_o4ar_2sGPOCYRrmLK3g==",
+        "hashed_password": "FO52gendqEKXvi1N5Fd7ABEQfAAooI_Qvr6Ha5yycrs="
+    },
+    "carloss": {
+        "salt": "3c6a1b23e7c7c0f6e377cbc10a4e84d6",
+        "password": "1335e860f47b9f0aaf3a102f39fd3104220b21c0da310d41d964fccd303b1d23"
+    },
+    "aaaaa": {
+        "salt": "WOU2hYs4t6Bk447MeHM1cA==",
+        "hashed_password": "NLqerm2l2rBj_peYsdkPrw_IyCo7vVmcrwhlXR5biIo="
+    },
+    "pacos": {
+        "salt": "2_GsJSkbY80mO1DDojqM1g==",
+        "hashed_password": "fLg-3pNk21z6LWDvHQMxFJ-1thUHXPUzJvWXS7F5Hqs="
+    }
 }
