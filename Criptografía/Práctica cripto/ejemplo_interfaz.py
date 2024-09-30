@@ -320,5 +320,88 @@ def menu():
 # =====================
 # EJECUCIÓN DEL MENÚ
 # =====================
+import tkinter as tk
+from tkinter import messagebox
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Sistema de Autenticación")
+
+        self.menú_frame = tk.Frame(self.root)
+        self.menú_frame.pack(padx=10, pady=10)
+
+        self.boton_registrar = tk.Button(self.menú_frame, text="Registrarse", command=self.mostrar_formulario_registro)
+        self.boton_registrar.pack(fill='x')
+
+        self.boton_iniciar_sesion = tk.Button(self.menú_frame, text="Iniciar sesión", command=self.mostrar_formulario_login)
+        self.boton_iniciar_sesion.pack(fill='x')
+
+        self.boton_salir = tk.Button(self.menú_frame, text="Salir", command=self.root.quit)
+        self.boton_salir.pack(fill='x')
+
+        self.formulario_frame = None
+
+    def mostrar_formulario_registro(self):
+        self.limpiar_pantalla()
+        self.formulario_frame = tk.Frame(self.root)
+        self.formulario_frame.pack(padx=10, pady=10)
+
+        tk.Label(self.formulario_frame, text="Nombre de usuario").grid(row=0, column=0)
+        self.entry_usuario = tk.Entry(self.formulario_frame)
+        self.entry_usuario.grid(row=0, column=1)
+
+        tk.Label(self.formulario_frame, text="Contraseña").grid(row=1, column=0)
+        self.entry_password = tk.Entry(self.formulario_frame, show='*')
+        self.entry_password.grid(row=1, column=1)
+
+        self.boton_registrar = tk.Button(self.formulario_frame, text="Registrarse", command=self.registrar_usuario_gui)
+        self.boton_registrar.grid(row=2, columnspan=2)
+
+        self.boton_volver = tk.Button(self.formulario_frame, text="Volver", command=self.volver_al_menu)
+        self.boton_volver.grid(row=3, columnspan=2)
+
+    def mostrar_formulario_login(self):
+        self.limpiar_pantalla()
+        self.formulario_frame = tk.Frame(self.root)
+        self.formulario_frame.pack(padx=10, pady=10)
+
+        tk.Label(self.formulario_frame, text="Nombre de usuario").grid(row=0, column=0)
+        self.entry_usuario = tk.Entry(self.formulario_frame)
+        self.entry_usuario.grid(row=0, column=1)
+
+        tk.Label(self.formulario_frame, text="Contraseña").grid(row=1, column=0)
+        self.entry_password = tk.Entry(self.formulario_frame, show='*')
+        self.entry_password.grid(row=1, column=1)
+
+        self.boton_iniciar_sesion = tk.Button(self.formulario_frame, text="Iniciar sesión", command=self.iniciar_sesion_gui)
+        self.boton_iniciar_sesion.grid(row=2, columnspan=2)
+
+        self.boton_volver = tk.Button(self.formulario_frame, text="Volver", command=self.volver_al_menu)
+        self.boton_volver.grid(row=3, columnspan=2)
+
+    def limpiar_pantalla(self):
+        if self.formulario_frame is not None:
+            self.formulario_frame.pack_forget()
+
+    def volver_al_menu(self):
+        self.limpiar_pantalla()
+        self.menú_frame.pack(padx=10, pady=10)
+
+    def registrar_usuario_gui(self):
+        nombre_usuario = self.entry_usuario.get()
+        password = self.entry_password.get()
+        resultado = registrar_usuario(nombre_usuario, password)
+        messagebox.showinfo("Registro", resultado)
+
+    def iniciar_sesion_gui(self):
+        nombre_usuario = self.entry_usuario.get()
+        password = self.entry_password.get()
+        resultado = autenticar_usuario(nombre_usuario, password)
+        messagebox.showinfo("Inicio de sesión", resultado)
+
+# Crear la ventana principal y ejecutar la aplicación
 if __name__ == "__main__":
-    menu()
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
