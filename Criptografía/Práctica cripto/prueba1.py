@@ -56,9 +56,19 @@ def validar_email(email):
     Verifica si el correo electrónico es válido y pertenece al dominio de Gmail (.com o .es).
     """
     patron = r'^[a-zA-Z0-9._%+-]+@gmail\.(com|es)$'
-    # Usamos re.fullmatch para que toda la cadena se verifique y no solo una parte.
-    return bool(re.fullmatch(patron, email))
+    if not bool(re.fullmatch(patron, email)):
+        raise ValidationError("El correo electrónico debe tener una forma válida y pertenecer al dominio de Gmail (.com o .es).")
+    return True
 
+def validar_telefono(telefono):
+    """
+    Verifica si el número de teléfono es válido.
+    """
+    # Este patrón verifica si el número de teléfono tiene 9 dígitos y comienza con 6 o 7.
+    patron = r'^[6-7]\d{8}$'
+    if not bool(re.fullmatch(patron, telefono)):
+        raise ValidationError("El número de teléfono debe tener 9 dígitos y comenzar con 6 o 7.")
+    return True
 
 def restaurar_contraseña(nombre_usuario, email):
     intentos = 0
@@ -115,7 +125,7 @@ class ValidationError(Exception):
     pass
 
 def validar_nombre_usuario(nombre_usuario):
-    if re.search("[\W]", nombre_usuario):
+    if re.search(r"[\W]", nombre_usuario):
         raise ValidationError("El nombre de usuario no debe contener caracteres especiales.")
     if len(nombre_usuario) > 15:
         raise ValidationError("El nombre de usuario no debe tener más de 15 caracteres.")
@@ -128,12 +138,22 @@ def validar_contraseña(password):
         raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
     if len(password) > 30:
         raise ValidationError("La contraseña no debe tener más de 30 caracteres.")
-    if not re.search("^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\W]).{8,30}$", password):
+    if not re.search(r"^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[\W]).{8,30}$", password):
         raise ValidationError("La contraseña debe contener al menos una letra, un número y un carácter especial.")
     return True
 
-def registrar_usuario(nombre_usuario, password):
+def registrar_usuario(nombre_usuario, password, email, telefono):
     usuarios = cargar_usuarios()
+
+    # Comprobaciones para asegurarse de que todos los campos están completos
+    if not nombre_usuario:
+        raise ValidationError("Error: Debes proporcionar un nombre de usuario.")
+    if not password:
+        raise ValidationError("Error: Debes proporcionar una contraseña.")
+    if not email:
+        raise ValidationError("Error: Debes proporcionar un correo electrónico.")
+    if not telefono:
+        raise ValidationError("Error: Debes proporcionar un número de teléfono.")
 
     if nombre_usuario in usuarios:
         raise ValidationError(f"Error: El usuario '{nombre_usuario}' ya existe.")
@@ -141,6 +161,8 @@ def registrar_usuario(nombre_usuario, password):
     try:
         validar_nombre_usuario(nombre_usuario)
         validar_contraseña(password)
+        validar_email(email)
+        validar_telefono(telefono)
     except ValidationError as e:
         raise e
 
@@ -149,7 +171,9 @@ def registrar_usuario(nombre_usuario, password):
 
     usuarios[nombre_usuario] = {
         'salt': base64.urlsafe_b64encode(salt).decode('utf-8'),
-        'hashed_password': hashed_password.decode('utf-8')
+        'hashed_password': hashed_password.decode('utf-8'),
+        'email': email,
+        'telefono': telefono
     }
 
     guardar_usuarios(usuarios)
@@ -258,6 +282,16 @@ class App:
         self.entry_password = ttk.Entry(self.frame_registro, show='*')
         self.entry_password.pack()
 
+        self.label_email = ttk.Label(self.frame_registro, text="Correo electrónico:")
+        self.label_email.pack()
+        self.entry_email = ttk.Entry(self.frame_registro)
+        self.entry_email.pack()
+
+        self.label_telefono = ttk.Label(self.frame_registro, text="Número de teléfono:")
+        self.label_telefono.pack()
+        self.entry_telefono = ttk.Entry(self.frame_registro)
+        self.entry_telefono.pack()
+
         self.boton_registrar = ttk.Button(self.frame_registro, text="Registrar", command=self.registrar_usuario)
         self.boton_registrar.pack(pady=5)
 
@@ -267,9 +301,11 @@ class App:
     def registrar_usuario(self):
         nombre_usuario = self.entry_usuario.get()
         password = self.entry_password.get()
+        email = self.entry_email.get()
+        telefono = self.entry_telefono.get()
 
         try:
-            if registrar_usuario(nombre_usuario, password):
+            if registrar_usuario(nombre_usuario, password, email, telefono):
                 messagebox.showinfo("Éxito", "Usuario registrado exitosamente.")
                 self.volver_menu()
         except ValidationError as e:
@@ -351,6 +387,18 @@ class App:
 
     def enviar_correo_restauracion(self, nombre_usuario):
         email = self.entry_email.get()
+        usuarios = cargar_usuarios()
+
+        # Comprobar si el usuario existe
+        if nombre_usuario not in usuarios:
+            messagebox.showerror("Error", "El usuario no está registrado.")
+            return
+
+        # Comprobar si el correo electrónico proporcionado coincide con el almacenado
+        if email != usuarios[nombre_usuario]['email']:
+            messagebox.showerror("Error", "El correo electrónico proporcionado no coincide con el registrado.")
+            return
+
         try:
             if restaurar_contraseña(nombre_usuario, email):
                 messagebox.showinfo("Éxito", "Correo de restauración enviado exitosamente.")
