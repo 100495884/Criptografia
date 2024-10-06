@@ -1,6 +1,7 @@
 import os
 import base64
 import hashlib
+import random
 import json
 import re
 import smtplib
@@ -9,6 +10,8 @@ from email.mime.text import MIMEText
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
@@ -47,7 +50,6 @@ def verificar_password(password, salt, hashed_password):
     except:
         return False
 
-
 # =====================
 # FUNCIONES DE RESTAURACIÓN DE CONTRASEÑA
 # =====================
@@ -70,40 +72,64 @@ def validar_telefono(telefono):
         raise ValidationError("El número de teléfono debe tener 9 dígitos y comenzar con 6 o 7.")
     return True
 
+def generar_pin():
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
 def restaurar_contraseña(nombre_usuario, email):
     intentos = 0
-    while intentos < 3:
-        if not validar_email(email):
-            intentos += 1
-            raise ValidationError("El correo electrónico debe tener una forma válida.")
+    pin = generar_pin()
 
-        # Configuración del servidor de correo
-        servidor_correo = "smtp.gmail.com"
-        puerto = 587
-        correo_envio = "100495692@alumnos.uc3m.es"
-        contraseña_correo = "miep iewr zlmc ycfp"
+    # Configuración del servidor de correo
+    servidor_correo = "smtp.gmail.com"
+    puerto = 587
+    correo_envio = "100495692@alumnos.uc3m.es"
+    contraseña_correo = "miep iewr zlmc ycfp"
 
-        # Creación del mensaje
-        mensaje = MIMEMultipart()
-        mensaje['From'] = correo_envio
-        mensaje['To'] = email
-        mensaje['Subject'] = "Restauración de contraseña"
-        cuerpo_mensaje = f"Hola {nombre_usuario},\n\nPara restablecer tu contraseña, por favor sigue este enlace: http://tu_sitio_web.com/restablecer_contraseña/{nombre_usuario}\n\nSi no has solicitado un restablecimiento de contraseña, por favor ignora este correo."
-        mensaje.attach(MIMEText(cuerpo_mensaje, 'plain'))
+    # Creación del mensaje
+    mensaje = MIMEMultipart()
+    mensaje['From'] = correo_envio
+    mensaje['To'] = email
+    mensaje['Subject'] = "Restauración de contraseña"
+    cuerpo_mensaje = f"Hola {nombre_usuario},\n\nTu PIN de restauración de contraseña es: {pin}\n\nSi no has solicitado un restablecimiento de contraseña, por favor ignora este correo."
+    mensaje.attach(MIMEText(cuerpo_mensaje, 'plain'))
 
-        # Conexión al servidor de correo y envío del mensaje
-        try:
-            servidor = smtplib.SMTP(servidor_correo, puerto)
-            servidor.starttls()
-            servidor.login(correo_envio, contraseña_correo)
-            servidor.send_message(mensaje)
-            servidor.quit()
-            return True
-        except smtplib.SMTPException as e:
-            raise ValidationError(f"Error al enviar el correo electrónico: {e}")
+    # Conexión al servidor de correo y envío del mensaje
+    try:
+        servidor = smtplib.SMTP(servidor_correo, puerto)
+        servidor.starttls()
+        servidor.login(correo_envio, contraseña_correo)
+        servidor.send_message(mensaje)
+        servidor.quit()
+    except smtplib.SMTPException as e:
+        raise ValidationError(f"Error al enviar el correo electrónico: {e}")
 
-    raise ValidationError("Has excedido el número de intentos para ingresar un correo válido.")
+    return pin
 
+
+def enviar_correo_aviso_cambio_contraseña(email, nombre_usuario):
+    # Configuración del servidor de correo
+    servidor_correo = "smtp.gmail.com"
+    puerto = 587
+    correo_envio = "100495692@alumnos.uc3m.es"
+    contraseña_correo = "miep iewr zlmc ycfp"
+
+    # Creación del mensaje
+    mensaje = MIMEMultipart()
+    mensaje['From'] = correo_envio
+    mensaje['To'] = email
+    mensaje['Subject'] = "Cambio de contraseña"
+    cuerpo_mensaje = f"Hola {nombre_usuario},\n\nTu contraseña ha sido cambiada exitosamente. Si no has sido tú, por favor contacta con el personal de mantenimiento escribiendo a este mismo email."
+    mensaje.attach(MIMEText(cuerpo_mensaje, 'plain'))
+
+    # Conexión al servidor de correo y envío del mensaje
+    try:
+        servidor = smtplib.SMTP(servidor_correo, puerto)
+        servidor.starttls()
+        servidor.login(correo_envio, contraseña_correo)
+        servidor.send_message(mensaje)
+        servidor.quit()
+    except smtplib.SMTPException as e:
+        raise ValidationError(f"Error al enviar el correo electrónico: {e}")
 
 # =====================
 # FUNCIONES PARA GESTIONAR EL ARCHIVO JSON
@@ -493,10 +519,12 @@ class App:
 
             usuarios[nombre_usuario]['hashed_password'] = hashed_nueva_password.decode('utf-8')
             guardar_usuarios(usuarios)
+            enviar_correo_aviso_cambio_contraseña(usuarios[nombre_usuario]['email'], nombre_usuario)
             messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
             self.mostrar_opciones()  # Volver al menú de opciones después de cambiar la contraseña
         except ValidationError as e:
             messagebox.showerror("Error", str(e))
+
 
     def volver_menu(self):
         self.limpiar_frame()
@@ -515,6 +543,125 @@ class App:
 
         self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=self.master.quit)
         self.boton_salir.pack(pady=5)
+
+    def mostrar_pantalla_restaurar_contraseña(self, nombre_usuario):
+        self.limpiar_login()
+        self.frame_restaurar_contraseña = ttk.Frame(self.master)
+        self.frame_restaurar_contraseña.pack(pady=20)
+
+        self.label_email = ttk.Label(self.frame_restaurar_contraseña, text="Ingresa tu correo electrónico:")
+        self.label_email.pack()
+        self.entry_email = ttk.Entry(self.frame_restaurar_contraseña)
+        self.entry_email.pack()
+
+        self.boton_enviar = ttk.Button(self.frame_restaurar_contraseña, text="Enviar",
+                                       command=lambda: self.enviar_correo_restauracion(nombre_usuario))
+        self.boton_enviar.pack(pady=5)
+
+        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver.pack(pady=5)
+
+    def enviar_correo_restauracion(self, nombre_usuario):
+        email = self.entry_email.get()
+        usuarios = cargar_usuarios()
+
+        # Comprobar si el usuario existe
+        if nombre_usuario not in usuarios:
+            messagebox.showerror("Error", "El usuario no está registrado.")
+            return
+
+        # Comprobar si el correo electrónico proporcionado coincide con el almacenado
+        if email != usuarios[nombre_usuario]['email']:
+            messagebox.showerror("Error", "El correo electrónico proporcionado no coincide con el registrado.")
+            return
+
+        try:
+            self.pin = restaurar_contraseña(nombre_usuario, email)
+            self.mostrar_pantalla_introducir_pin(nombre_usuario)
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+
+    def mostrar_pantalla_introducir_pin(self, nombre_usuario):
+        self.limpiar_login()
+        self.frame_introducir_pin = ttk.Frame(self.master)
+        self.frame_introducir_pin.pack(pady=20)
+
+        self.label_pin = ttk.Label(self.frame_introducir_pin, text="Ingresa el PIN enviado a tu correo:")
+        self.label_pin.pack()
+        self.entry_pin = ttk.Entry(self.frame_introducir_pin)
+        self.entry_pin.pack()
+
+        self.boton_verificar_pin = ttk.Button(self.frame_introducir_pin, text="Verificar PIN",
+                                              command=lambda: self.verificar_pin(nombre_usuario))
+        self.boton_verificar_pin.pack(pady=5)
+
+        self.boton_volver = ttk.Button(self.frame_introducir_pin, text="Volver", command=self.volver_menu)
+        self.boton_volver.pack(pady=5)
+
+    def verificar_pin(self, nombre_usuario):
+        pin_introducido = self.entry_pin.get()
+        intentos = 0
+
+        if pin_introducido == self.pin:
+            self.mostrar_nueva_contraseña()
+        else:
+            intentos += 1
+            if intentos >= 3:
+                messagebox.showerror("Error",
+                                     "Se han acabado los intentos y se ha bloqueado la opción de restaurar por cuestiones de seguridad.")
+                self.volver_menu()
+            else:
+                messagebox.showerror("Error", "PIN incorrecto. Inténtalo de nuevo.")
+
+    def mostrar_nueva_contraseña(self):
+        self.limpiar_login()
+        self.frame_nueva_contraseña = ttk.Frame(self.master)
+        self.frame_nueva_contraseña.pack(pady=20)
+
+        self.label_nueva = ttk.Label(self.frame_nueva_contraseña, text="Nueva contraseña:")
+        self.label_nueva.pack()
+        self.entry_nueva = ttk.Entry(self.frame_nueva_contraseña, show='*')
+        self.entry_nueva.pack()
+
+        self.label_confirmar = ttk.Label(self.frame_nueva_contraseña, text="Confirmar nueva contraseña:")
+        self.label_confirmar.pack()
+        self.entry_confirmar = ttk.Entry(self.frame_nueva_contraseña, show='*')
+        self.entry_confirmar.pack()
+
+        self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña",
+                                                command=self.cambiar_contraseña)
+        self.boton_confirmar_nueva.pack(pady=5)
+
+        self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver_nueva.pack(pady=5)
+
+    def cambiar_contraseña(self):
+        usuarios = cargar_usuarios()
+        nombre_usuario = self.usuario_actual
+        nueva_password = self.entry_nueva.get()
+        confirmar_password = self.entry_confirmar.get()
+
+        try:
+            # Validar que las nuevas contraseñas coincidan
+            if nueva_password != confirmar_password:
+                messagebox.showerror("Error", "Las nuevas contraseñas no coinciden.")
+                return
+
+            # Validar la nueva contraseña usando la misma lógica de registro
+            validar_contraseña(nueva_password)
+
+            # Si la validación es exitosa, continuar con el cambio de contraseña
+            salt = base64.urlsafe_b64decode(usuarios[nombre_usuario]['salt'])
+            hashed_nueva_password = hash_password(nueva_password, salt)
+
+            usuarios[nombre_usuario]['hashed_password'] = hashed_nueva_password.decode('utf-8')
+            guardar_usuarios(usuarios)
+            enviar_correo_aviso_cambio_contraseña(usuarios[nombre_usuario]['email'], nombre_usuario)
+            messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
+            self.mostrar_opciones()  # Volver al menú de opciones después de cambiar la contraseña
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+
 
 # =====================
 # EJECUCIÓN DE LA APLICACIÓN
