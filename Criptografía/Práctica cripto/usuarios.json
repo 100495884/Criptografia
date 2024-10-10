@@ -3,12 +3,28 @@
         "salt": "cG5QXLMUyLmibougARj3Og==",
         "hashed_password": "N_NvdRY39dBawhgGGUTFWRg-tP4YNFF6qJ7cJi_x3hI=",
         "email": "alberto.menchen3b@gmail.com",
-        "telefono": "722633047"
+        "telefono": "722633047",
+        "contrase\u00f1as": [
+            {
+                "asunto": "caca",
+                "contrase\u00f1a": "agustin51"
+            },
+            {
+                "asunto": "moyano",
+                "contrase\u00f1a": "gay123"
+            }
+        ]
     },
     "raquel": {
         "salt": "_S4KV3I6sUB1cqnErdo5_Q==",
         "hashed_password": "oIO3Ui6WPWsRSeEL4A6q-0ISV_OE8qTCcgUukO4CO5I=",
         "email": "raquelgonzalezgonzalo@gmail.com",
         "telefono": "637484568"
+    },
+    "moyano": {
+        "salt": "MRuXIJp7yjYLXoW-CODiYQ==",
+        "hashed_password": "itAjuAw0xNjjHRz4hvEueq_YphFIZV2kfrHJlLg8nxc=",
+        "email": "moyanooo14memes@gmail.com",
+        "telefono": "640523989"
     }
 }
