@@ -28,9 +28,15 @@
         "telefono": "640523989"
     },
     "pacos": {
-        "salt": "Edh4VU9rm1nQbDPkSMEz0w==",
-        "hashed_password": "VeDUZ_ex-C44K7CGxSytIDzZaHkBCebz05MpisgrtYo=",
+        "salt": "bnYm3Jgaww4WeLr8zOYIQw==",
+        "hashed_password": "FxEjMeRox2iIRRl1tS5VaQOBHQ7f9NzDDOOU40vdN2s=",
         "email": "m.oyanooo14memes@gmail.com",
-        "telefono": "666666666"
+        "telefono": "666666666",
+        "contrase\u00f1as": [
+            {
+                "asunto": "csdc",
+                "contrase\u00f1a": "cdscd"
+            }
+        ]
     }
 }
