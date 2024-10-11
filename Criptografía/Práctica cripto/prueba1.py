@@ -398,6 +398,9 @@ class App:
         self.frame_opciones = None
         self.frame_cambiar_contraseña = None
         self.frame_nueva_contraseña = None
+        self.frame_restaurar_contraseña = None
+        self.frame_introducir_pin = None
+        self.frame_introducir_pin = None
 
     def limpiar_frame(self):
         for widget in self.master.winfo_children():
@@ -416,6 +419,28 @@ class App:
             self.frame_cambiar_contraseña.pack_forget()
         if self.frame_nueva_contraseña is not None:
             self.frame_nueva_contraseña.pack_forget()
+        if self.frame_restaurar_contraseña is not None:
+            self.frame_restaurar_contraseña.pack_forget()
+
+
+    def volver_menu(self):
+        self.limpiar_frame()
+        self.menu_frame = ttk.Frame(self.master)
+        self.menu_frame.pack(pady=20)
+
+        self.label = ttk.Label(self.menu_frame, text="Bienvenido al sistema")
+        self.label.pack()
+
+        self.boton_registrar = ttk.Button(self.menu_frame, text="Registrarse", command=self.mostrar_registro)
+        self.boton_registrar.pack(pady=5)
+
+        self.boton_autenticar = ttk.Button(self.menu_frame, text="Iniciar sesión",
+                                           command=self.mostrar_login_usuario)
+        self.boton_autenticar.pack(pady=5)
+
+        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=self.master.quit)
+        self.boton_salir.pack(pady=5)
+
 
     def mostrar_registro(self):
         self.limpiar_frame()
@@ -497,11 +522,8 @@ class App:
         self.boton_autenticar = ttk.Button(self.frame_contraseña, text="Iniciar sesión", command=self.autenticar_usuario)
         self.boton_autenticar.pack(pady=5)
 
-        self.boton_olvidar = ttk.Button(self.frame_contraseña, text="Olvidé mi contraseña", command=lambda: self.mostrar_pantalla_restaurar_contraseña(self.usuario_actual))
+        self.boton_olvidar = ttk.Button(self.frame_contraseña, text="Olvidé mi contraseña", command=lambda: self.olvide_contraseña(self.usuario_actual))
         self.boton_olvidar.pack(pady=5)
-
-        self.boton_cambiar = ttk.Button(self.frame_contraseña, text="Cambiar contraseña", command=self.mostrar_cambiar_contraseña)
-        self.boton_cambiar.pack(pady=5)
 
         self.boton_volver = ttk.Button(self.frame_contraseña, text="Volver", command=self.volver_menu)
         self.boton_volver.pack(pady=5)
@@ -520,7 +542,7 @@ class App:
 
         # Función para mostrar la pantalla de recuperación de contraseña
 
-    def mostrar_pantalla_restaurar_contraseña(self, nombre_usuario):
+    def olvide_contraseña(self, nombre_usuario):
         self.limpiar_login()
         self.frame_restaurar_contraseña = ttk.Frame(self.master)
         self.frame_restaurar_contraseña.pack(pady=20)
@@ -534,10 +556,9 @@ class App:
                                        command=lambda: self.enviar_correo_restauracion(nombre_usuario))
         self.boton_enviar.pack(pady=5)
 
-        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.mostrar_contraseña)
         self.boton_volver.pack(pady=5)
 
-        # Función para enviar el correo de restauración
 
     def enviar_correo_restauracion(self, nombre_usuario):
         email = self.entry_email.get()
@@ -578,7 +599,7 @@ class App:
         self.boton_administrar_contraseñas = ttk.Button(self.opciones_frame, text="Administrar Contraseñas", command=self.administrar_contraseñas)
         self.boton_administrar_contraseñas.pack(pady=5)
 
-        self.boton_cerrar_sesion = ttk.Button(self.opciones_frame, text="Cerrar Sesión", command=self.volver_menu)
+        self.boton_cerrar_sesion = ttk.Button(self.opciones_frame, text="Cerrar Sesión", command=self.master.quit)
         self.boton_cerrar_sesion.pack(pady=5)
 
     def mostrar_cambiar_contraseña(self):
@@ -591,26 +612,46 @@ class App:
         self.entry_actual = ttk.Entry(self.frame_cambiar_contraseña, show='*')
         self.entry_actual.pack()
 
-        self.label_nueva = ttk.Label(self.frame_cambiar_contraseña, text="Nueva contraseña:")
-        self.label_nueva.pack()
-        self.entry_nueva = ttk.Entry(self.frame_cambiar_contraseña, show='*')
-        self.entry_nueva.pack()
-
-        self.label_confirmar = ttk.Label(self.frame_cambiar_contraseña, text="Confirmar nueva contraseña:")
-        self.label_confirmar.pack()
-        self.entry_confirmar = ttk.Entry(self.frame_cambiar_contraseña, show='*')
-        self.entry_confirmar.pack()
-
-        self.boton_confirmar = ttk.Button(self.frame_cambiar_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña)
+        self.boton_confirmar = ttk.Button(self.frame_cambiar_contraseña, text="Continuar", command=self.verificar_contraseña_actual)
         self.boton_confirmar.pack(pady=5)
 
-        self.boton_volver = ttk.Button(self.frame_cambiar_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver = ttk.Button(self.frame_cambiar_contraseña, text="Volver", command=self.mostrar_opciones)
         self.boton_volver.pack(pady=5)
 
     def consultar_perfil(self):
-        mostrar_perfil_usuario(self.usuario_actual)
+        usuarios = cargar_usuarios()
+        nombre_usuario = self.usuario_actual
 
+        if nombre_usuario not in usuarios:
+            messagebox.showerror("Error", "Usuario no encontrado.")
+            return
 
+        user_data = usuarios[nombre_usuario]
+
+        email = user_data['email']
+        telefono = user_data['telefono']
+
+        # Limpiar el frame actual
+        self.limpiar_frame()
+        self.frame_consultar_perfil = ttk.Frame(self.master)
+        self.frame_consultar_perfil.pack(pady=20)
+
+        # Mostrar la información del perfil
+        ttk.Label(self.frame_consultar_perfil, text="Correo Electrónico:").pack(pady=5)
+        ttk.Label(self.frame_consultar_perfil, text=email).pack(pady=5)
+
+        ttk.Label(self.frame_consultar_perfil, text="Teléfono:").pack(pady=5)
+        ttk.Label(self.frame_consultar_perfil, text=telefono).pack(pady=5)
+
+        # Contar el número de claves almacenadas
+        num_claves = len(usuarios)                                                                                        #Cambiar por la función que cuente las claves almacenadas
+        ttk.Label(self.frame_consultar_perfil, text="Número de Claves Almacenadas:").pack(pady=5)
+        ttk.Label(self.frame_consultar_perfil, text=num_claves).pack(pady=5)
+
+        # Botón para cerrar (volver al menú anterior)
+        self.boton_cerrar = ttk.Button(self.frame_consultar_perfil, text="Cerrar",
+                                       command=self.mostrar_opciones)  # Cambia esto por el método que desees para cerrar
+        self.boton_cerrar.pack(pady=20)
 
     def verificar_contraseña_actual(self):
         usuarios = cargar_usuarios()
@@ -643,76 +684,34 @@ class App:
         self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña)
         self.boton_confirmar_nueva.pack(pady=5)
 
-        self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.volver_menu)
+        self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.mostrar_opciones)
         self.boton_volver_nueva.pack(pady=5)
 
     def cambiar_contraseña(self):
         usuarios = cargar_usuarios()
         nombre_usuario = self.usuario_actual
-        password_actual = self.entry_actual.get()
         nueva_password = self.entry_nueva.get()
         confirmar_password = self.entry_confirmar.get()
 
         if nueva_password != confirmar_password:
             messagebox.showerror("Error", "Las contraseñas no coinciden.")
             return
-
-        salt = base64.urlsafe_b64decode(usuarios[nombre_usuario]['salt'])
-        hashed_password = usuarios[nombre_usuario]['hashed_password']
-
-        if not verificar_password(password_actual, salt, hashed_password):
-            messagebox.showerror("Error", "La contraseña actual es incorrecta.")
-            return
-
         try:
             validar_contraseña(nueva_password)
         except ValidationError as e:
             messagebox.showerror("Error", str(e))
             return
 
+        salt = generar_salt()
         hashed_password = hash_password(nueva_password, salt)
         usuarios[nombre_usuario]['hashed_password'] = hashed_password.decode('utf-8')
+        usuarios[nombre_usuario]['salt'] = base64.urlsafe_b64encode(salt).decode('utf-8')
+
         guardar_usuarios(usuarios)
 
-        enviar_correo_aviso_cambio_contraseña(usuarios[nombre_usuario]['email'], nombre_usuario)
         messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
-        self.volver_menu()
+        self.mostrar_opciones()
 
-
-    def volver_menu(self):
-        self.limpiar_frame()
-        self.menu_frame = ttk.Frame(self.master)
-        self.menu_frame.pack(pady=20)
-
-        self.label = ttk.Label(self.menu_frame, text="Bienvenido al sistema")
-        self.label.pack()
-
-        self.boton_registrar = ttk.Button(self.menu_frame, text="Registrarse", command=self.mostrar_registro)
-        self.boton_registrar.pack(pady=5)
-
-        self.boton_autenticar = ttk.Button(self.menu_frame, text="Iniciar sesión",
-                                           command=self.mostrar_login_usuario)
-        self.boton_autenticar.pack(pady=5)
-
-        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=self.master.quit)
-        self.boton_salir.pack(pady=5)
-
-    def mostrar_pantalla_restaurar_contraseña(self, nombre_usuario):
-        self.limpiar_login()
-        self.frame_restaurar_contraseña = ttk.Frame(self.master)
-        self.frame_restaurar_contraseña.pack(pady=20)
-
-        self.label_email = ttk.Label(self.frame_restaurar_contraseña, text="Ingresa tu correo electrónico:")
-        self.label_email.pack()
-        self.entry_email = ttk.Entry(self.frame_restaurar_contraseña)
-        self.entry_email.pack()
-
-        self.boton_enviar = ttk.Button(self.frame_restaurar_contraseña, text="Enviar",
-                                       command=lambda: self.enviar_correo_restauracion(nombre_usuario))
-        self.boton_enviar.pack(pady=5)
-
-        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.volver_menu)
-        self.boton_volver.pack(pady=5)
 
     def enviar_correo_restauracion(self, nombre_usuario):
         email = self.entry_email.get()
@@ -745,13 +744,13 @@ class App:
         self.entry_pin.pack()
 
         self.boton_verificar_pin = ttk.Button(self.frame_introducir_pin, text="Verificar PIN",
-                                              command=lambda: self.verificar_pin(nombre_usuario))
+                                              command=lambda: self.verificar_pin())
         self.boton_verificar_pin.pack(pady=5)
 
         self.boton_volver = ttk.Button(self.frame_introducir_pin, text="Volver", command=self.volver_menu)
         self.boton_volver.pack(pady=5)
 
-    def verificar_pin(self, nombre_usuario):
+    def verificar_pin(self):
         pin_introducido = self.entry_pin.get()
         intentos = 0
 

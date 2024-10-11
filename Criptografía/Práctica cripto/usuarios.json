@@ -26,5 +26,11 @@
         "hashed_password": "itAjuAw0xNjjHRz4hvEueq_YphFIZV2kfrHJlLg8nxc=",
         "email": "moyanooo14memes@gmail.com",
         "telefono": "640523989"
+    },
+    "pacos": {
+        "salt": "Edh4VU9rm1nQbDPkSMEz0w==",
+        "hashed_password": "VeDUZ_ex-C44K7CGxSytIDzZaHkBCebz05MpisgrtYo=",
+        "email": "m.oyanooo14memes@gmail.com",
+        "telefono": "666666666"
     }
 }
