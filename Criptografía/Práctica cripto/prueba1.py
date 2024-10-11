@@ -319,6 +319,16 @@ def mostrar_perfil_usuario(nombre_usuario):
 
     ttk.Button(perfil_ventana, text="Cerrar", command=perfil_ventana.destroy).pack(pady=20)
 
+def cambiar_contraseña(nombre_usuario, nueva_contraseña):
+    usuarios = cargar_usuarios()
+    salt = generar_salt()
+    hashed_password = hash_password(nueva_contraseña, salt)
+    usuarios[nombre_usuario]['salt'] = base64.urlsafe_b64encode(salt).decode('utf-8')
+    usuarios[nombre_usuario]['hashed_password'] = hashed_password.decode('utf-8')
+    guardar_usuarios(usuarios)
+    messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
+    enviar_correo_aviso_cambio_contraseña(usuarios[nombre_usuario]['email'], nombre_usuario)
+
 def guardar_contraseña(nombre_usuario, asunto, contraseña):
     usuarios = cargar_usuarios()
     if nombre_usuario not in usuarios:
@@ -619,39 +629,7 @@ class App:
         self.boton_volver.pack(pady=5)
 
     def consultar_perfil(self):
-        usuarios = cargar_usuarios()
-        nombre_usuario = self.usuario_actual
-
-        if nombre_usuario not in usuarios:
-            messagebox.showerror("Error", "Usuario no encontrado.")
-            return
-
-        user_data = usuarios[nombre_usuario]
-
-        email = user_data['email']
-        telefono = user_data['telefono']
-
-        # Limpiar el frame actual
-        self.limpiar_frame()
-        self.frame_consultar_perfil = ttk.Frame(self.master)
-        self.frame_consultar_perfil.pack(pady=20)
-
-        # Mostrar la información del perfil
-        ttk.Label(self.frame_consultar_perfil, text="Correo Electrónico:").pack(pady=5)
-        ttk.Label(self.frame_consultar_perfil, text=email).pack(pady=5)
-
-        ttk.Label(self.frame_consultar_perfil, text="Teléfono:").pack(pady=5)
-        ttk.Label(self.frame_consultar_perfil, text=telefono).pack(pady=5)
-
-        # Contar el número de claves almacenadas
-        num_claves = len(usuarios)                                                                                        #Cambiar por la función que cuente las claves almacenadas
-        ttk.Label(self.frame_consultar_perfil, text="Número de Claves Almacenadas:").pack(pady=5)
-        ttk.Label(self.frame_consultar_perfil, text=num_claves).pack(pady=5)
-
-        # Botón para cerrar (volver al menú anterior)
-        self.boton_cerrar = ttk.Button(self.frame_consultar_perfil, text="Cerrar",
-                                       command=self.mostrar_opciones)  # Cambia esto por el método que desees para cerrar
-        self.boton_cerrar.pack(pady=20)
+        mostrar_perfil_usuario(self.usuario_actual)
 
     def verificar_contraseña_actual(self):
         usuarios = cargar_usuarios()
@@ -681,35 +659,17 @@ class App:
         self.entry_confirmar = ttk.Entry(self.frame_nueva_contraseña, show='*')
         self.entry_confirmar.pack()
 
-        self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña)
+        self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña",
+                                                command=self.cambiar_contraseña)
         self.boton_confirmar_nueva.pack(pady=5)
 
         self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.mostrar_opciones)
         self.boton_volver_nueva.pack(pady=5)
 
     def cambiar_contraseña(self):
-        usuarios = cargar_usuarios()
         nombre_usuario = self.usuario_actual
-        nueva_password = self.entry_nueva.get()
-        confirmar_password = self.entry_confirmar.get()
-
-        if nueva_password != confirmar_password:
-            messagebox.showerror("Error", "Las contraseñas no coinciden.")
-            return
-        try:
-            validar_contraseña(nueva_password)
-        except ValidationError as e:
-            messagebox.showerror("Error", str(e))
-            return
-
-        salt = generar_salt()
-        hashed_password = hash_password(nueva_password, salt)
-        usuarios[nombre_usuario]['hashed_password'] = hashed_password.decode('utf-8')
-        usuarios[nombre_usuario]['salt'] = base64.urlsafe_b64encode(salt).decode('utf-8')
-
-        guardar_usuarios(usuarios)
-
-        messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
+        nueva_contraseña = self.entry_nueva.get()
+        cambiar_contraseña(nombre_usuario, nueva_contraseña)
         self.mostrar_opciones()
 
 
