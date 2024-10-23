@@ -5,6 +5,7 @@ import random
 import json
 import re
 import smtplib
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from cryptography.hazmat.backends import default_backend
@@ -26,6 +27,24 @@ ARCHIVO_USUARIOS = "usuarios.json"
 # =====================
 
 #Funciones de Cifrado simétrico
+def generar_clave_aes(longitud=32):
+    """
+    Genera una clave AES de la longitud especificada.
+    Longitud por defecto: 32 bytes (256 bits).
+    """
+    return os.urandom(longitud)
+
+def actualizar_usuarios_con_clave():
+    usuarios = cargar_usuarios()
+    for nombre_usuario, datos in usuarios.items():
+        if 'clave' not in datos:
+            clave = generar_clave_aes()
+            datos['clave'] = base64.urlsafe_b64encode(clave).decode('utf-8')
+    guardar_usuarios(usuarios)
+
+# Configuración del log
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
+
 def cifrar_aes(mensaje: str, clave: bytes) -> bytes:
     iv = os.urandom(16)
     cipher = Cipher(algorithms.AES(clave), modes.CBC(iv), backend=default_backend())
@@ -33,6 +52,10 @@ def cifrar_aes(mensaje: str, clave: bytes) -> bytes:
     padder = padding.PKCS7(algorithms.AES.block_size).padder()
     padded_data = padder.update(mensaje.encode()) + padder.finalize()
     cifrado = encryptor.update(padded_data) + encryptor.finalize()
+
+    # Registro de la operación
+    logging.debug(f"Cifrado AES realizado. Algoritmo: AES, Longitud de clave: {len(clave)*8} bits")
+
     return iv + cifrado
 
 def descifrar_aes(cifrado: bytes, clave: bytes) -> str:
@@ -42,38 +65,10 @@ def descifrar_aes(cifrado: bytes, clave: bytes) -> str:
     padded_data = decryptor.update(cifrado[16:]) + decryptor.finalize()
     unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
     data = unpadder.update(padded_data) + unpadder.finalize()
-    return data.decode()
 
-#Funciones de Cifrado asimétrico
-def generar_claves_rsa():
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
-    )
-    public_key = private_key.public_key()
-    return private_key, public_key
+    # Registro de la operación
+    logging.debug(f"Descifrado AES realizado. Algoritmo: AES, Longitud de clave: {len(clave)*8} bits")
 
-def cifrar_rsa(mensaje: str, public_key) -> bytes:
-    cifrado = public_key.encrypt(
-        mensaje.encode(),
-        asym_padding.OAEP(
-            mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
-        )
-    )
-    return cifrado
-
-def descifrar_rsa(cifrado: bytes, private_key) -> str:
-    data = private_key.decrypt(
-        cifrado,
-        asym_padding.OAEP(
-            mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
-        )
-    )
     return data.decode()
 
 #Funciones de Hashing
@@ -130,7 +125,18 @@ def validar_telefono(telefono):
 def generar_pin():
     return ''.join([str(random.randint(0, 9)) for _ in range(6)])
 
-def restaurar_contraseña(nombre_usuario, email):
+def restaurar_contraseña(nombre_usuario, email_proporcionado):
+    usuarios = cargar_usuarios()
+    if nombre_usuario not in usuarios:
+        raise ValidationError("Usuario no encontrado.")
+
+    user_data = usuarios[nombre_usuario]
+    clave = base64.urlsafe_b64decode(user_data['clave'])  # Decodificar la clave desde base64
+    email_descifrado = descifrar_aes(base64.urlsafe_b64decode(user_data['email']), clave)  # Descifrar el email almacenado
+
+    if email_descifrado != email_proporcionado:
+        raise ValidationError("El correo electrónico no coincide con el registrado.")
+
     intentos = 0
     pin = generar_pin()
 
@@ -143,7 +149,7 @@ def restaurar_contraseña(nombre_usuario, email):
     # Creación del mensaje
     mensaje = MIMEMultipart()
     mensaje['From'] = correo_envio
-    mensaje['To'] = email
+    mensaje['To'] = email_descifrado
     mensaje['Subject'] = "Restauración de contraseña"
     cuerpo_mensaje = f"Hola {nombre_usuario},\n\nTu PIN de restauración de contraseña es: {pin}\n\nSi no has solicitado un restablecimiento de contraseña, por favor ignora este correo."
     mensaje.attach(MIMEText(cuerpo_mensaje, 'plain'))
@@ -160,8 +166,12 @@ def restaurar_contraseña(nombre_usuario, email):
 
     return pin
 
-
 def enviar_correo_aviso_cambio_contraseña(email, nombre_usuario):
+    usuarios = cargar_usuarios()
+    user_data = usuarios[nombre_usuario]
+    clave = base64.urlsafe_b64decode(user_data['clave'])  # Decodificar la clave desde base64
+    email = descifrar_aes(base64.urlsafe_b64decode(email), clave)  # Descifrar el email
+
     # Configuración del servidor de correo
     servidor_correo = "smtp.gmail.com"
     puerto = 587
@@ -249,17 +259,21 @@ def registrar_usuario(nombre_usuario, password, email, telefono):
 
     salt = generar_salt()
     hashed_password = hash_password(password, salt)
+    clave = generar_clave_aes()
+
+    email_cifrado = cifrar_aes(email, clave)
+    telefono_cifrado = cifrar_aes(telefono, clave)
 
     usuarios[nombre_usuario] = {
         'salt': base64.urlsafe_b64encode(salt).decode('utf-8'),
         'hashed_password': hashed_password.decode('utf-8'),
-        'email': email,
-        'telefono': telefono
+        'email': base64.urlsafe_b64encode(email_cifrado).decode('utf-8'),
+        'telefono': base64.urlsafe_b64encode(telefono_cifrado).decode('utf-8'),
+        'clave': base64.urlsafe_b64encode(clave).decode('utf-8')
     }
 
     guardar_usuarios(usuarios)
     return True
-
 def autenticar_usuario(nombre_usuario, password):
     usuarios = cargar_usuarios()
     if nombre_usuario not in usuarios:
@@ -270,7 +284,10 @@ def autenticar_usuario(nombre_usuario, password):
     hashed_password = user_data['hashed_password']
 
     if verificar_password(password, salt, hashed_password):
-        return True
+        return {
+            'nombre_usuario': nombre_usuario,
+            'clave': base64.urlsafe_b64decode(user_data['clave'])
+        }
     else:
         raise ValidationError("Error: Contraseña incorrecta.")
 
@@ -281,9 +298,13 @@ def consultar_usuario(nombre_usuario):
         raise ValidationError("Usuario no encontrado.")
 
     user_data = usuarios[nombre_usuario]
+    clave = base64.urlsafe_b64decode(user_data['clave'])
 
-    email = user_data['email']
-    telefono = user_data['telefono']
+    email_cifrado = base64.urlsafe_b64decode(user_data['email'])
+    telefono_cifrado = base64.urlsafe_b64decode(user_data['telefono'])
+
+    email = descifrar_aes(email_cifrado, clave)
+    telefono = descifrar_aes(telefono_cifrado, clave)
 
     return {
         'nombre_usuario': nombre_usuario,
@@ -296,17 +317,38 @@ def guardar_contraseña(nombre_usuario, asunto, contraseña):
     if nombre_usuario not in usuarios:
         raise ValidationError("Usuario no encontrado.")
 
+    user_data = usuarios[nombre_usuario]
+    clave = base64.urlsafe_b64decode(user_data['clave'])  # Decodificar la clave desde base64
+
+    contraseña_cifrada = cifrar_aes(contraseña, clave)
+
     if 'contraseñas' not in usuarios[nombre_usuario]:
         usuarios[nombre_usuario]['contraseñas'] = []
 
-    usuarios[nombre_usuario]['contraseñas'].append({'asunto': asunto, 'contraseña': contraseña})
+    usuarios[nombre_usuario]['contraseñas'].append({
+        'asunto': asunto,
+        'contraseña': base64.urlsafe_b64encode(contraseña_cifrada).decode('utf-8')
+    })
     guardar_usuarios(usuarios)
 
 def obtener_contraseñas(nombre_usuario):
     usuarios = cargar_usuarios()
     if nombre_usuario not in usuarios or 'contraseñas' not in usuarios[nombre_usuario]:
         return []
-    return usuarios[nombre_usuario]['contraseñas']
+
+    user_data = usuarios[nombre_usuario]
+    clave = base64.urlsafe_b64decode(user_data['clave'])  # Decodificar la clave desde base64
+
+    contraseñas_descifradas = []
+    for item in usuarios[nombre_usuario]['contraseñas']:
+        contraseña_cifrada = base64.urlsafe_b64decode(item['contraseña'])
+        contraseña = descifrar_aes(contraseña_cifrada, clave)
+        contraseñas_descifradas.append({
+            'asunto': item['asunto'],
+            'contraseña': contraseña
+        })
+
+    return contraseñas_descifradas
 
 def eliminar_contraseña(nombre_usuario, asunto):
     usuarios = cargar_usuarios()
@@ -515,6 +557,19 @@ class App:
         # Función para mostrar la pantalla de recuperación de contraseña
 
     def olvide_contraseña(self, nombre_usuario):
+        usuarios = cargar_usuarios()
+        if nombre_usuario not in usuarios:
+            messagebox.showerror("Error", "Usuario no encontrado.")
+            return
+
+        user_data = usuarios[nombre_usuario]
+        clave = base64.urlsafe_b64decode(user_data['clave'])  # Decodificar la clave desde base64
+        email_cifrado = base64.urlsafe_b64decode(user_data['email'])  # Decodificar el email cifrado desde base64
+        email_descifrado = descifrar_aes(email_cifrado, clave)  # Descifrar el email almacenado
+
+        # Guardar el email descifrado temporalmente
+        self.email_descifrado = email_descifrado
+
         self.limpiar_login()
         self.frame_restaurar_contraseña = ttk.Frame(self.master)
         self.frame_restaurar_contraseña.pack(pady=20)
@@ -532,21 +587,13 @@ class App:
         self.boton_volver.pack(pady=5)
 
     def enviar_correo_restauracion(self, nombre_usuario):
-        email = self.entry_email.get()
-        usuarios = cargar_usuarios()
-
-        # Comprobar si el usuario existe
-        if nombre_usuario not in usuarios:
-            messagebox.showerror("Error", "El usuario no está registrado.")
-            return
-
-        # Comprobar si el correo electrónico proporcionado coincide con el almacenado
-        if email != usuarios[nombre_usuario]['email']:
+        email_proporcionado = self.entry_email.get()
+        if email_proporcionado != self.email_descifrado:
             messagebox.showerror("Error", "El correo electrónico proporcionado no coincide con el registrado.")
             return
 
         try:
-            self.pin = restaurar_contraseña(nombre_usuario, email)
+            self.pin = restaurar_contraseña(nombre_usuario, email_proporcionado)
             self.mostrar_pantalla_introducir_pin(nombre_usuario)
         except ValidationError as e:
             messagebox.showerror("Error", str(e))
@@ -576,14 +623,18 @@ class App:
         usuarios = cargar_usuarios()
         nombre_usuario = self.usuario_actual
 
+
         if nombre_usuario not in usuarios:
             messagebox.showerror("Error", "Usuario no encontrado.")
             return
 
         user_data = usuarios[nombre_usuario]
+        clave = base64.urlsafe_b64decode(user_data['clave'])  # Decodificar la clave desde base64
+        email_cifrado = base64.urlsafe_b64decode(user_data['email'])
+        telefono_cifrado = base64.urlsafe_b64decode(user_data['telefono'])
 
-        email = user_data['email']
-        telefono = user_data['telefono']
+        email = descifrar_aes(email_cifrado, clave)
+        telefono = descifrar_aes(telefono_cifrado, clave)
 
         # Limpiar el frame actual
         self.limpiar_frame()
@@ -598,7 +649,7 @@ class App:
         ttk.Label(self.frame_consultar_perfil, text=telefono).pack(pady=5)
 
         # Contar el número de claves almacenadas
-        num_claves = len(usuarios)                                                                                        #Cambiar por la función que cuente las claves almacenadas
+        num_claves = len(usuarios)  # Cambiar por la función que cuente las claves almacenadas
         ttk.Label(self.frame_consultar_perfil, text="Número de Claves Almacenadas:").pack(pady=5)
         ttk.Label(self.frame_consultar_perfil, text=num_claves).pack(pady=5)
 

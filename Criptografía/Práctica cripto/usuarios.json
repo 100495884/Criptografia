@@ -1,42 +1,26 @@
 {
     "alberto": {
-        "salt": "D147j3ekRubPKabo7wBbrg==",
-        "hashed_password": "IPc9EJshOWCjetfW8soFDQ1LDdbFWKHlqfU8yNV9BhM=",
-        "email": "alberto.menchen3b@gmail.com",
-        "telefono": "722633047",
+        "salt": "Hmh-gYVwLSXtwi0WaNrzeA==",
+        "hashed_password": "TjuM8qStWgizMK8qj95U8osDF5pjb4Wm47pYZmoe_oY=",
+        "email": "KZ6QgPPRAmbjYLE3WOLV4GVxe_Jz1Ux6ogoc1ypjFu4NryhfbYoXwgrxP4lEflhd",
+        "telefono": "lIS4QSzgmz5ur1IKNhCF-SY35hnyCVZP_6t9lndNE3g=",
+        "clave": "3_Cj1Y1Qdqen0duXJBD97UfNNKeJ9wfUPUJ-Opciq1U=",
         "contrase\u00f1as": [
             {
-                "asunto": "caca",
-                "contrase\u00f1a": "agustin51"
+                "asunto": "alberto",
+                "contrase\u00f1a": "1UiDvJf7UOLeAcGAXxQ6AIA6l2NOPIRjRHdU505ayAM="
             },
             {
                 "asunto": "moyano",
-                "contrase\u00f1a": "gay123"
+                "contrase\u00f1a": "9yTE4BXQQ2_2IHn7seI0XIOLrAHHZovRbZDh5R8Kves="
             }
         ]
-    },
-    "raquel": {
-        "salt": "_S4KV3I6sUB1cqnErdo5_Q==",
-        "hashed_password": "oIO3Ui6WPWsRSeEL4A6q-0ISV_OE8qTCcgUukO4CO5I=",
-        "email": "raquelgonzalezgonzalo@gmail.com",
-        "telefono": "637484568"
     },
     "moyano": {
-        "salt": "MRuXIJp7yjYLXoW-CODiYQ==",
-        "hashed_password": "itAjuAw0xNjjHRz4hvEueq_YphFIZV2kfrHJlLg8nxc=",
-        "email": "moyanooo14memes@gmail.com",
-        "telefono": "640523989"
-    },
-    "pacos": {
-        "salt": "bnYm3Jgaww4WeLr8zOYIQw==",
-        "hashed_password": "FxEjMeRox2iIRRl1tS5VaQOBHQ7f9NzDDOOU40vdN2s=",
-        "email": "m.oyanooo14memes@gmail.com",
-        "telefono": "666666666",
-        "contrase\u00f1as": [
-            {
-                "asunto": "csdc",
-                "contrase\u00f1a": "cdscd"
-            }
-        ]
+        "salt": "vqLBgfydw-8qTSPlqbISqQ==",
+        "hashed_password": "evabe_DOqYjcyv4mQF4hRPvQkMJDOPnUDm18wgtifF8=",
+        "email": "MElmY1ONbaECAtSixo1KUSR5VKeCP9piIpMzrx1C5t9k76Y6l32tC5FCuJwXePo_",
+        "telefono": "pH_2PcVFyMoAKDY4oyMfAILTDu4YZP9oExfe2autTR4=",
+        "clave": "jiOCDiE-Hyp1qZy_Lh_pmHviil0pJHXsiHIF9I99m_M="
     }
 }
