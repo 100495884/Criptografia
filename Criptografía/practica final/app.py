@@ -20,60 +20,89 @@ from exceptions import ValidationError
 class App:
     def __init__(self, master):
         self.master = master
-        master.title("Sistema de Registro y Autenticación")
-        master.geometry("700x600")
-        master.configure(bg="white")  # Fondo completamente blanco
+        self.master.title("Sistema de Registro y Autenticación")
+        self.master.geometry("700x600")
+        self.master.configure(bg="white")  # Fondo completamente blanco
 
         # Configuración global de fondo blanco para todos los Frames
-        master.option_add("*Frame.Background", "white")
+        self.master.option_add("*Frame.Background", "white")
 
         # Estilos personalizados
         self.style = ttk.Style()
         self.style.theme_use("clam")
 
-        # Configuración de estilo para botones primarios y secundarios
+        # Configuración de estilo para Frames
+        self.style.configure("TFrame", background="white")
+
+        # Configuración de estilo para etiquetas
         self.style.configure(
-            "Primary.TButton",
+            "TLabel",
             padding=10,
+            relief="flat",
+            background="white",
+            foreground="black",
+            font=("Helvetica", 12, "bold")
+        )
+
+
+        # Configuración de estilo para botones primarios con tamaño fijo
+        self.style.configure(
+            "TButton",
+            relief="flat",
+            background="#1330ED",  # Azul navy claro
+            foreground="white",
+            font=("Helvetica", 12, "bold"),
+            width=20,
+            padding=(0, 10),
+        )
+        self.style.map(
+            "TButton",
+            background=[("active", "#1029C9")],  # Azul más oscuro al hacer hover
+            foreground=[("active", "white")]
+        )
+
+        # Configuración de estilo para botones secundarios con tamaño fijo
+        self.style.configure(
+            "Secondary.TButton",
             relief="flat",
             background="#1A237E",  # Azul navy oscuro
             foreground="white",
-            font=("Helvetica", 12, "bold")
+            font=("Helvetica", 12, "bold"),
+            width=20,
         )
         self.style.map(
-            "Primary.TButton",
+            "Secondary.TButton",
             background=[("active", "#0D1B55")],  # Azul navy más oscuro al hacer hover
             foreground=[("active", "white")]
         )
 
+        # Configuración de estilo para entradas de texto
         self.style.configure(
-            "Secondary.TButton",
-            padding=10,
-            relief="flat",
-            background="#3949AB",  # Azul navy claro
-            foreground="white",
-            font=("Helvetica", 12, "bold")
+            "TEntry",
+            padding=(0, 5),
+            foreground="Black",
         )
-        self.style.map(
-            "Secondary.TButton",
-            background=[("active", "#2E3B8F")],  # Azul más oscuro al hacer hover
-            foreground=[("active", "white")]
-        )
+        self.master.option_add("*TEntry.Font", ("Helvetica", 12))
+        self.master.option_add("*TEntry.Width", 20)
+        self.master.option_add("*TEntry.Justify", "center")
+
+
+
         # Frame principal
-        self.menu_frame = tk.Frame(self.master)
-        self.menu_frame.pack(pady=20)
+        self.menu_frame = ttk.Frame(self.master)
+        self.menu_frame.pack()
 
         self.label = ttk.Label(self.menu_frame, text="Bienvenido al sistema")
-        self.label.pack(pady=(0, 20))
+        self.label.pack()
 
         self.boton_registrar = ttk.Button(self.menu_frame, text="Registrarse", command=self.mostrar_registro)
-        self.boton_registrar.pack(pady=5)
+        self.boton_registrar.pack(pady=15)
 
         self.boton_autenticar = ttk.Button(self.menu_frame, text="Iniciar sesión", command=self.mostrar_login_usuario)
-        self.boton_autenticar.pack(pady=5)
+        self.boton_autenticar.pack(pady=15)
 
-        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=master.quit)
-        self.boton_salir.pack(pady=5)
+        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=master.quit, style="Secondary.TButton")
+        self.boton_salir.pack(pady=15)
 
         # Inicializamos variables para mantener el estado
         self.usuario_actual = None
@@ -88,7 +117,13 @@ class App:
         self.frame_nueva_contraseña = None
         self.frame_restaurar_contraseña = None
         self.frame_introducir_pin = None
-        self.frame_introducir_pin = None
+        self.frame_añadir_contraseña = None
+        self.frame_consultar_perfil = None
+        self.frame_consultar_contraseñas = None
+        self.frame_eliminar_contraseña = None
+        self.frame_mostrar_contraseña = None
+        self.frame_administrar_contraseña = None
+
 
     def limpiar_frame(self):
         for widget in self.master.winfo_children():
@@ -97,27 +132,27 @@ class App:
 
     def volver_menu(self):
         self.limpiar_frame()
-        self.menu_frame = tk.Frame(self.master)
-        self.menu_frame.pack(pady=20)
+        self.menu_frame = ttk.Frame(self.master)
+        self.menu_frame.pack()
 
         self.label = ttk.Label(self.menu_frame, text="Bienvenido al sistema")
         self.label.pack()
 
         self.boton_registrar = ttk.Button(self.menu_frame, text="Registrarse", command=self.mostrar_registro)
-        self.boton_registrar.pack(pady=5)
+        self.boton_registrar.pack(pady=15)
 
         self.boton_autenticar = ttk.Button(self.menu_frame, text="Iniciar sesión",
                                            command=self.mostrar_login_usuario)
-        self.boton_autenticar.pack(pady=5)
+        self.boton_autenticar.pack(pady=15)
 
-        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=self.master.quit)
-        self.boton_salir.pack(pady=5)
+        self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=self.master.quit, style="Secondary.TButton")
+        self.boton_salir.pack(pady=15)
 
 
     def mostrar_registro(self):
         self.limpiar_frame()
-        self.frame_registro = tk.Frame(self.master)
-        self.frame_registro.pack(pady=20)
+        self.frame_registro = ttk.Frame(self.master)
+        self.frame_registro.pack()
 
         self.label_usuario = ttk.Label(self.frame_registro, text="Nombre de usuario:")
         self.label_usuario.pack()
@@ -140,10 +175,10 @@ class App:
         self.entry_telefono.pack()
 
         self.boton_registrar = ttk.Button(self.frame_registro, text="Registrar", command=self.registrar_usuario)
-        self.boton_registrar.pack(pady=5)
+        self.boton_registrar.pack(pady=15)
 
-        self.boton_volver = ttk.Button(self.frame_registro, text="Volver", command=self.volver_menu)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_registro, text="Volver", command=self.volver_menu, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     def registrar_usuario(self):
         nombre_usuario = self.entry_usuario.get()
@@ -160,8 +195,8 @@ class App:
 
     def mostrar_login_usuario(self):
         self.limpiar_frame()
-        self.frame_login = tk.Frame(self.master)
-        self.frame_login.pack(pady=20)
+        self.frame_login = ttk.Frame(self.master)
+        self.frame_login.pack()
 
         self.label_usuario = ttk.Label(self.frame_login, text="Nombre de usuario:")
         self.label_usuario.pack()
@@ -169,10 +204,10 @@ class App:
         self.entry_usuario_login.pack()
 
         self.boton_confirmar = ttk.Button(self.frame_login, text="Continuar", command=self.mostrar_contraseña)
-        self.boton_confirmar.pack(pady=5)
+        self.boton_confirmar.pack(pady=15)
 
-        self.boton_volver = ttk.Button(self.frame_login, text="Volver", command=self.volver_menu)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_login, text="Volver", command=self.volver_menu, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     def mostrar_contraseña(self):
         self.usuario_actual = self.entry_usuario_login.get()
@@ -183,8 +218,8 @@ class App:
             return
 
         self.limpiar_frame()
-        self.frame_contraseña = tk.Frame(self.master)
-        self.frame_contraseña.pack(pady=20)
+        self.frame_contraseña = ttk.Frame(self.master)
+        self.frame_contraseña.pack()
 
         self.label_password = ttk.Label(self.frame_contraseña, text="Contraseña:")
         self.label_password.pack()
@@ -192,13 +227,13 @@ class App:
         self.entry_password_login.pack()
 
         self.boton_autenticar = ttk.Button(self.frame_contraseña, text="Iniciar sesión", command=self.autenticar_usuario)
-        self.boton_autenticar.pack(pady=5)
+        self.boton_autenticar.pack(pady=15)
 
         self.boton_olvidar = ttk.Button(self.frame_contraseña, text="Olvidé mi contraseña", command=lambda: self.olvide_contraseña(self.usuario_actual))
-        self.boton_olvidar.pack(pady=5)
+        self.boton_olvidar.pack(pady=15)
 
-        self.boton_volver = ttk.Button(self.frame_contraseña, text="Volver", command=self.volver_menu)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_contraseña, text="Volver", command=self.volver_menu, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     def autenticar_usuario(self):
         usuarios = json_management.cargar_usuarios()
@@ -247,8 +282,8 @@ class App:
 
         # Configurar la interfaz para que el usuario ingrese su correo
         self.limpiar_frame()
-        self.frame_restaurar_contraseña = tk.Frame(self.master)
-        self.frame_restaurar_contraseña.pack(pady=20)
+        self.frame_restaurar_contraseña = ttk.Frame(self.master)
+        self.frame_restaurar_contraseña.pack()
 
         self.label_email = ttk.Label(self.frame_restaurar_contraseña, text="Ingresa tu correo electrónico:")
         self.label_email.pack()
@@ -258,10 +293,10 @@ class App:
         # Pasamos self.clave_sesion al método enviar_correo_restauracion
         self.boton_enviar = ttk.Button(self.frame_restaurar_contraseña, text="Enviar",
                                        command=lambda: self.enviar_correo_restauracion(nombre_usuario))
-        self.boton_enviar.pack(pady=5)
+        self.boton_enviar.pack(pady=15)
 
-        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.mostrar_contraseña)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.mostrar_contraseña, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     def enviar_correo_restauracion(self, nombre_usuario):
         email_proporcionado = self.entry_email.get()
@@ -278,23 +313,23 @@ class App:
 
     def mostrar_opciones(self):
         self.limpiar_frame()
-        self.opciones_frame = tk.Frame(self.master)
-        self.opciones_frame.pack(pady=20)
+        self.opciones_frame = ttk.Frame(self.master)
+        self.opciones_frame.pack()
 
         self.label = ttk.Label(self.opciones_frame, text=f"Bienvenido, {self.usuario_actual}")
         self.label.pack()
 
         self.boton_consultar_perfil = ttk.Button(self.opciones_frame, text="Consultar Perfil", command=self.consultar_perfil)
-        self.boton_consultar_perfil.pack(pady=5)
+        self.boton_consultar_perfil.pack(pady=15)
 
         self.boton_cambiar_contraseña = ttk.Button(self.opciones_frame, text="Cambiar Contraseña", command=self.mostrar_cambiar_contraseña)
-        self.boton_cambiar_contraseña.pack(pady=5)
+        self.boton_cambiar_contraseña.pack(pady=15)
 
         self.boton_administrar_contraseñas = ttk.Button(self.opciones_frame, text="Administrar Contraseñas", command=self.administrar_contraseñas)
-        self.boton_administrar_contraseñas.pack(pady=5)
+        self.boton_administrar_contraseñas.pack(pady=15)
 
-        self.boton_cerrar_sesion = ttk.Button(self.opciones_frame, text="Cerrar Sesión", command=self.cerrar_sesion)
-        self.boton_cerrar_sesion.pack(pady=5)
+        self.boton_cerrar_sesion = ttk.Button(self.opciones_frame, text="Cerrar Sesión", command=self.cerrar_sesion, style="Secondary.TButton")
+        self.boton_cerrar_sesion.pack(pady=15)
 
     def cerrar_sesion(self):
         self.clave_sesion = None
@@ -317,30 +352,24 @@ class App:
 
         # Limpiar el frame actual
         self.limpiar_frame()
-        self.frame_consultar_perfil = tk.Frame(self.master)
-        self.frame_consultar_perfil.pack(pady=20)
+        self.frame_consultar_perfil = ttk.Frame(self.master)
+        self.frame_consultar_perfil.pack(pady=10)
 
-        # Mostrar la información del perfil
-        ttk.Label(self.frame_consultar_perfil, text="Correo Electrónico:").pack(pady=5)
-        ttk.Label(self.frame_consultar_perfil, text=email).pack(pady=5)
+        # Mostrar la información del perfil en una sola Label por línea
+        ttk.Label(self.frame_consultar_perfil, text=f"Correo Electrónico: {email}").pack(pady=5)
+        ttk.Label(self.frame_consultar_perfil, text=f"Teléfono: {telefono}").pack(pady=5)
 
-        ttk.Label(self.frame_consultar_perfil, text="Teléfono:").pack(pady=5)
-        ttk.Label(self.frame_consultar_perfil, text=telefono).pack(pady=5)
-
-        # Contar el número de claves almacenadas
         num_claves = len(user_data.get("contraseñas", []))
-        ttk.Label(self.frame_consultar_perfil, text="Número de Claves Almacenadas:").pack(pady=5)
-        ttk.Label(self.frame_consultar_perfil, text=num_claves).pack(pady=5)
+        ttk.Label(self.frame_consultar_perfil, text=f"Número de Claves Almacenadas: {num_claves}").pack(pady=5)
 
         # Botón para cerrar (volver al menú anterior)
-        self.boton_cerrar = ttk.Button(self.frame_consultar_perfil, text="Cerrar",
-                                       command=self.mostrar_opciones)  # Cambia esto por el método que desees para cerrar
-        self.boton_cerrar.pack(pady=20)
+        self.boton_cerrar = ttk.Button(self.frame_consultar_perfil, text="Cerrar", command=self.mostrar_opciones, style="Secondary.TButton")
+        self.boton_cerrar.pack(pady=15)
 
     def mostrar_cambiar_contraseña(self):
         self.limpiar_frame()
-        self.frame_cambiar_contraseña = tk.Frame(self.master)
-        self.frame_cambiar_contraseña.pack(pady=20)
+        self.frame_cambiar_contraseña = ttk.Frame(self.master)
+        self.frame_cambiar_contraseña.pack()
 
         self.label_actual = ttk.Label(self.frame_cambiar_contraseña, text="Contraseña actual:")
         self.label_actual.pack()
@@ -348,10 +377,10 @@ class App:
         self.entry_actual.pack()
 
         self.boton_confirmar = ttk.Button(self.frame_cambiar_contraseña, text="Continuar", command=self.verificar_contraseña_actual)
-        self.boton_confirmar.pack(pady=5)
+        self.boton_confirmar.pack(pady=15)
 
-        self.boton_volver = ttk.Button(self.frame_cambiar_contraseña, text="Volver", command=self.mostrar_opciones)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_cambiar_contraseña, text="Volver", command=self.mostrar_opciones, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     def verificar_contraseña_actual(self):
         usuarios = json_management.cargar_usuarios()
@@ -370,7 +399,6 @@ class App:
     def mostrar_nueva_contraseña(self):
         self.limpiar_frame()
         self.frame_nueva_contraseña = (self.master)
-        self.frame_nueva_contraseña.pack(pady=20)
 
         self.label_nueva = ttk.Label(self.frame_nueva_contraseña, text="Nueva contraseña:")
         self.label_nueva.pack()
@@ -383,10 +411,10 @@ class App:
         self.entry_confirmar.pack()
 
         self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña)
-        self.boton_confirmar_nueva.pack(pady=5)
+        self.boton_confirmar_nueva.pack(pady=15)
 
-        self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.mostrar_opciones)
-        self.boton_volver_nueva.pack(pady=5)
+        self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.mostrar_opciones, style="Secondary.TButton")
+        self.boton_volver_nueva.pack(pady=15)
 
     def cambiar_contraseña(self):
         usuarios = json_management.cargar_usuarios()
@@ -476,8 +504,8 @@ class App:
 
     def mostrar_pantalla_introducir_pin(self, nombre_usuario):
         self.limpiar_frame()
-        self.frame_introducir_pin = tk.Frame(self.master)
-        self.frame_introducir_pin.pack(pady=20)
+        self.frame_introducir_pin = ttk.Frame(self.master)
+        self.frame_introducir_pin.pack()
 
         self.label_pin = ttk.Label(self.frame_introducir_pin, text="Ingresa el PIN enviado a tu correo:")
         self.label_pin.pack()
@@ -486,10 +514,10 @@ class App:
 
         self.boton_verificar_pin = ttk.Button(self.frame_introducir_pin, text="Verificar PIN",
                                               command=lambda: self.verificar_pin())
-        self.boton_verificar_pin.pack(pady=5)
+        self.boton_verificar_pin.pack(pady=15)
 
-        self.boton_volver = ttk.Button(self.frame_introducir_pin, text="Volver", command=self.volver_menu)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_introducir_pin, text="Volver", command=self.volver_menu, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     def verificar_pin(self):
         pin_introducido = self.entry_pin.get()
@@ -508,34 +536,35 @@ class App:
 
     def administrar_contraseñas(self):
         self.limpiar_frame()
-        self.frame_administrar_contraseñas = tk.Frame(self.master)
-        self.frame_administrar_contraseñas.pack(pady=20)
+        self.frame_administrar_contraseñas = ttk.Frame(self.master)
+        self.frame_administrar_contraseñas.pack()
 
         # Botón para añadir una nueva contraseña
-        self.boton_añadir_contraseña = ttk.Button(self.frame_administrar_contraseñas, text="Añadir Nueva Contraseña",
+        self.boton_añadir_contraseña = ttk.Button(self.frame_administrar_contraseñas, text="Nueva Contraseña",
                                                   command=self.añadir_nueva_contraseña)
-        self.boton_añadir_contraseña.pack(pady=5)
+        self.boton_añadir_contraseña.pack(pady=15)
 
         # Botón para gestionar contraseñas
         self.boton_gestionar_contraseñas = ttk.Button(self.frame_administrar_contraseñas, text="Gestionar Contraseñas",
                                                       command=self.gestionar_contraseñas)
-        self.boton_gestionar_contraseñas.pack(pady=5)
+        self.boton_gestionar_contraseñas.pack(pady=15)
 
         # Botón para eliminar contraseñas
         self.boton_eliminar_contraseña = ttk.Button(self.frame_administrar_contraseñas, text="Eliminar Contraseñas",
                                                     command=self.eliminar_contraseñas)
-        self.boton_eliminar_contraseña.pack(pady=5)
+        self.boton_eliminar_contraseña.pack(pady=15)
 
         # Botón para salir o volver
-        self.boton_volver = ttk.Button(self.frame_administrar_contraseñas, text="Volver", command=self.mostrar_opciones)
-        self.boton_volver.pack(pady=5)
+        self.boton_volver = ttk.Button(self.frame_administrar_contraseñas, text="Volver", command=self.mostrar_opciones, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
         # Pantalla para añadir una nueva contraseña
 
     def añadir_nueva_contraseña(self):
         self.limpiar_frame()
-        self.frame_añadir_contraseña = (self.master)
-        self.frame_añadir_contraseña.pack(pady=20)
+        self.frame_añadir_contraseña = ttk.Frame(self.master)
+        self.frame_añadir_contraseña.pack()
+
 
         self.label_asunto = ttk.Label(self.frame_añadir_contraseña, text="Asunto:")
         self.label_asunto.pack()
@@ -549,11 +578,11 @@ class App:
 
         self.boton_guardar_contraseña = ttk.Button(self.frame_añadir_contraseña, text="Guardar Contraseña",
                                                    command=self.guardar_contraseña)
-        self.boton_guardar_contraseña.pack(pady=5)
+        self.boton_guardar_contraseña.pack(pady=15)
 
         self.boton_volver = ttk.Button(self.frame_añadir_contraseña, text="Volver",
-                                       command=self.administrar_contraseñas)
-        self.boton_volver.pack(pady=5)
+                                       command=self.administrar_contraseñas, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
         # Pantalla para gestionar contraseñas (ver todas)
 
@@ -562,8 +591,8 @@ class App:
         contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion)
 
         self.limpiar_frame()
-        self.frame_gestionar_contraseñas = tk.Frame(self.master)
-        self.frame_gestionar_contraseñas.pack(pady=20)
+        self.frame_gestionar_contraseñas = ttk.Frame(self.master)
+        self.frame_gestionar_contraseñas.pack()
 
         if contraseñas:
             self.contraseñas_visibles = {}
@@ -572,24 +601,24 @@ class App:
                 ttk.Label(self.frame_gestionar_contraseñas, text=f"Asunto: {contraseña['asunto']}").pack()
 
                 self.contraseñas_visibles[idx] = False
-                frame_contraseña = tk.Frame(self.frame_gestionar_contraseñas)
-                frame_contraseña.pack(pady=5)
+                frame_contraseña = ttk.Frame(self.frame_gestionar_contraseñas)
+                frame_contraseña.pack()
 
                 label_contraseña = ttk.Label(frame_contraseña, text="********")
                 label_contraseña.pack(side="left")
 
                 boton_mostrar = ttk.Button(frame_contraseña, text="Mostrar")
-                boton_mostrar.pack(side="left")
+                boton_mostrar.pack(side="left", padx=5)
 
                 boton_mostrar.config(
                     command=lambda i=idx, lbl=label_contraseña, btn=boton_mostrar, contra=contraseña['contraseña']:
                     self.mostrar_ocultar_contraseña(i, lbl, btn, contra))
         else:
-            ttk.Label(self.frame_gestionar_contraseñas, text="No hay contraseñas guardadas.").pack(pady=5)
+            ttk.Label(self.frame_gestionar_contraseñas, text="No hay contraseñas guardadas.").pack()
 
         self.boton_volver = ttk.Button(self.frame_gestionar_contraseñas, text="Volver",
-                                       command=self.administrar_contraseñas)
-        self.boton_volver.pack(pady=5)
+                                       command=self.administrar_contraseñas, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
     # Función para mostrar/ocultar la contraseña
     def mostrar_ocultar_contraseña(self, idx, label_contraseña, boton_mostrar, contraseña):
@@ -609,24 +638,24 @@ class App:
                                           self.clave_sesion)  # Llamar a la función que obtiene contraseñas
 
         self.limpiar_frame()
-        self.frame_eliminar_contraseñas = tk.Frame(self.master)
-        self.frame_eliminar_contraseñas.pack(pady=20)
+        self.frame_eliminar_contraseñas = ttk.Frame(self.master)
+        self.frame_eliminar_contraseñas.pack()
 
         if contraseñas:
             for contraseña in contraseñas:
-                frame_contraseña = tk.Frame(self.frame_eliminar_contraseñas)
-                frame_contraseña.pack(pady=5)
+                frame_contraseña = ttk.Frame(self.frame_eliminar_contraseñas)
+                frame_contraseña.pack()
 
                 ttk.Label(frame_contraseña, text=f"Asunto: {contraseña['asunto']}").pack(side="left")
                 ttk.Button(frame_contraseña, text="Eliminar",
                            command=lambda asunto=contraseña['asunto']: self.eliminar_contraseña(asunto)).pack(
-                    side="left")
+                    side="left", padx=5)
         else:
-            ttk.Label(self.frame_eliminar_contraseñas, text="No hay contraseñas guardadas.").pack(pady=5)
+            ttk.Label(self.frame_eliminar_contraseñas, text="No hay contraseñas guardadas.").pack()
 
         self.boton_volver = ttk.Button(self.frame_eliminar_contraseñas, text="Volver",
-                                       command=self.administrar_contraseñas)
-        self.boton_volver.pack(pady=5)
+                                       command=self.administrar_contraseñas, style="Secondary.TButton")
+        self.boton_volver.pack(pady=15)
 
         # Función para guardar contraseña
 
