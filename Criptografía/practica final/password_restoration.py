@@ -17,7 +17,7 @@ def generar_pin():
 
 
 # Método para restaurar la contraseña
-def restaurar_contraseña(nombre_usuario, email_proporcionado, clave_sesion):
+def restaurar_contraseña(nombre_usuario, email_proporcionado, clave_email):
     usuarios = json_management.cargar_usuarios()
     if nombre_usuario not in usuarios:
         raise ValidationError("Usuario no encontrado.")
@@ -27,7 +27,7 @@ def restaurar_contraseña(nombre_usuario, email_proporcionado, clave_sesion):
     email_nonce = base64.urlsafe_b64decode(user_data['email']['nonce'])
     email_tag = base64.urlsafe_b64decode(user_data['email']['tag'])
 
-    email_descifrado = encryption.descifrar_aes_gcm(email_cifrado, clave_sesion, email_nonce, email_tag)
+    email_descifrado = encryption.descifrar_aes_gcm(email_cifrado, clave_email, email_nonce, email_tag)
 
     if email_descifrado != email_proporcionado:
         raise ValidationError("El correo electrónico no coincide con el registrado.")
@@ -61,14 +61,14 @@ def restaurar_contraseña(nombre_usuario, email_proporcionado, clave_sesion):
     return pin
 
 # Enviar aviso de cambio de contraseña
-def enviar_correo_aviso_cambio_contraseña(nombre_usuario, clave_sesion):
+def enviar_correo_aviso_cambio_contraseña(nombre_usuario, clave_email):
     usuarios = json_management.cargar_usuarios()
     user_data = usuarios[nombre_usuario]
 
     email_cifrado = base64.urlsafe_b64decode(user_data['email']['cifrado'])
     email_nonce = base64.urlsafe_b64decode(user_data['email']['nonce'])
     email_tag = base64.urlsafe_b64decode(user_data['email']['tag'])
-    email = encryption.descifrar_aes_gcm(email_cifrado, clave_sesion, email_nonce, email_tag)
+    email = encryption.descifrar_aes_gcm(email_cifrado, clave_email, email_nonce, email_tag)
 
     # Configuración del servidor de correo
     servidor_correo = "smtp.gmail.com"

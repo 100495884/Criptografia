@@ -107,6 +107,7 @@ class App:
         # Inicializamos variables para mantener el estado
         self.usuario_actual = None
         self.clave_sesion = None
+        self.clave_email = None
 
         # Frames para las diferentes pantallas
         self.frame_registro = None
@@ -246,6 +247,8 @@ class App:
                 user_data = usuarios[nombre_usuario]
                 salt_cifrado = base64.urlsafe_b64decode(user_data['salt_cifrado'])
                 self.clave_sesion = encryption.derivar_clave_cifrado(password, salt_cifrado)
+                salt_email = base64.urlsafe_b64decode(user_data['salt_email'])
+                self.clave_email = encryption.derivar_clave_cifrado(nombre_usuario, salt_email)
                 messagebox.showinfo("Éxito", f"Ingreso exitoso como {nombre_usuario}.")
                 self.mostrar_opciones()
         except ValidationError as e:
@@ -257,9 +260,18 @@ class App:
 
     def cifrar_dato(self, mensaje: str) -> dict:
         return encryption.cifrar_aes_gcm(mensaje, self.clave_sesion)
+    def cifrar_dato_email(self, mensaje: str) -> dict:
+        return encryption.cifrar_aes_gcm(mensaje, self.clave_email)
 
     def descifrar_dato(self, cifrado: bytes, nonce: bytes, tag: bytes) -> str:
+        if self.clave_sesion is None:
+            raise ValueError("Clave de sesión no está inicializada.")
         return encryption.descifrar_aes_gcm(cifrado, self.clave_sesion, nonce, tag)
+
+    def descifrar_dato_email(self, cifrado: bytes, nonce: bytes, tag: bytes) -> str:
+        if self.clave_email is None:
+            raise ValueError("Clave de correo no está inicializada.")
+        return encryption.descifrar_aes_gcm(cifrado, self.clave_email, nonce, tag)
 
     def olvide_contraseña(self, nombre_usuario):
         usuarios = json_management.cargar_usuarios()
@@ -268,6 +280,8 @@ class App:
             return
 
         user_data = usuarios[nombre_usuario]
+        salt_email = base64.urlsafe_b64decode(user_data['salt_email'])
+        self.clave_email = encryption.derivar_clave_cifrado(nombre_usuario, salt_email)
 
         # Obtener y descifrar el correo con la clave de sesión
         email_cifrado = base64.urlsafe_b64decode(user_data['email']['cifrado'])
@@ -275,7 +289,7 @@ class App:
         email_tag = base64.urlsafe_b64decode(user_data['email']['tag'])
 
         # Utilizamos self.clave_sesion para descifrar el email
-        email_descifrado = encryption.descifrar_aes_gcm(email_cifrado, self.clave_sesion, email_nonce, email_tag)
+        email_descifrado = encryption.descifrar_aes_gcm(email_cifrado, self.clave_email, email_nonce, email_tag)
 
         # Guardar el email descifrado temporalmente
         self.email_descifrado = email_descifrado
@@ -292,13 +306,13 @@ class App:
 
         # Pasamos self.clave_sesion al método enviar_correo_restauracion
         self.boton_enviar = ttk.Button(self.frame_restaurar_contraseña, text="Enviar",
-                                       command=lambda: self.enviar_correo_restauracion(nombre_usuario))
+                                       command=lambda: self.enviar_correo_restauracion(nombre_usuario, self.clave_email))
         self.boton_enviar.pack(pady=15)
 
         self.boton_volver = ttk.Button(self.frame_restaurar_contraseña, text="Volver", command=self.mostrar_contraseña, style="Secondary.TButton")
         self.boton_volver.pack(pady=15)
 
-    def enviar_correo_restauracion(self, nombre_usuario):
+    def enviar_correo_restauracion(self, nombre_usuario, clave_email):
         email_proporcionado = self.entry_email.get()
         if email_proporcionado != self.email_descifrado:
             messagebox.showerror("Error", "El correo electrónico proporcionado no coincide con el registrado.")
@@ -306,7 +320,7 @@ class App:
 
         try:
             # Almacena el PIN temporalmente después de la restauración
-            self.pin = password_restoration.restaurar_contraseña(nombre_usuario, email_proporcionado, self.clave_sesion)
+            self.pin = password_restoration.restaurar_contraseña(nombre_usuario, email_proporcionado, clave_email)
             self.mostrar_pantalla_introducir_pin(nombre_usuario)
         except ValidationError as e:
             messagebox.showerror("Error", str(e))
@@ -347,7 +361,7 @@ class App:
         telefono_nonce = base64.urlsafe_b64decode(user_data['telefono']['nonce'])
         telefono_tag = base64.urlsafe_b64decode(user_data['telefono']['tag'])
 
-        email = self.descifrar_dato(email_cifrado, email_nonce, email_tag)
+        email = self.descifrar_dato_email(email_cifrado, email_nonce, email_tag)
         telefono = self.descifrar_dato(telefono_cifrado, telefono_nonce, telefono_tag)
 
         # Limpiar el frame actual
@@ -410,7 +424,7 @@ class App:
         self.entry_confirmar = ttk.Entry(self.frame_nueva_contraseña, show='*')
         self.entry_confirmar.pack()
 
-        self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña)
+        self.boton_confirmar_nueva = ttk.Button(self.frame_nueva_contraseña, text="Cambiar contraseña", command=self.cambiar_contraseña, )
         self.boton_confirmar_nueva.pack(pady=15)
 
         self.boton_volver_nueva = ttk.Button(self.frame_nueva_contraseña, text="Volver", command=self.mostrar_opciones, style="Secondary.TButton")
@@ -421,6 +435,9 @@ class App:
         nombre_usuario = self.usuario_actual
         nueva_password = self.entry_nueva.get()
         confirmar_password = self.entry_confirmar.get()
+        password = self.entry_nueva.get()
+        salt_cifrado = base64.urlsafe_b64decode(usuarios[nombre_usuario]['salt_cifrado'])
+        self.clave_sesion = encryption.derivar_clave_cifrado(password, salt_cifrado)
 
         if nueva_password != confirmar_password:
             messagebox.showerror("Error", "Las contraseñas no coinciden.")
@@ -434,17 +451,18 @@ class App:
 
         # Paso 1: Descifrar datos personales y contraseñas almacenadas con la clave actual
         user_data = usuarios[nombre_usuario]
-        email_cifrado = base64.urlsafe_b64decode(user_data['email']['cifrado'])
-        email_nonce = base64.urlsafe_b64decode(user_data['email']['nonce'])
-        email_tag = base64.urlsafe_b64decode(user_data['email']['tag'])
 
         telefono_cifrado = base64.urlsafe_b64decode(user_data['telefono']['cifrado'])
         telefono_nonce = base64.urlsafe_b64decode(user_data['telefono']['nonce'])
         telefono_tag = base64.urlsafe_b64decode(user_data['telefono']['tag'])
 
+        email_cifrado = base64.urlsafe_b64decode(user_data['email']['cifrado'])
+        email_nonce = base64.urlsafe_b64decode(user_data['email']['nonce'])
+        email_tag = base64.urlsafe_b64decode(user_data['email']['tag'])
+
         # Descifrar email y teléfono
-        email_descifrado = self.descifrar_dato(email_cifrado, email_nonce, email_tag)
         telefono_descifrado = self.descifrar_dato(telefono_cifrado, telefono_nonce, telefono_tag)
+        email_descifrado = self.descifrar_dato_email(email_cifrado, email_nonce, email_tag)
 
         # Descifrar contraseñas almacenadas
         contraseñas_descifradas = []
@@ -458,11 +476,13 @@ class App:
         # Paso 2: Generar nuevo salt y hash para la nueva contraseña
         salt_password = password_hashing.generar_salt()
         salt_cifrado = password_hashing.generar_salt()
+        salt_email = password_hashing.generar_salt()
         hashed_password = password_hashing.hash_password(nueva_password, salt_password)
         nueva_clave = encryption.derivar_clave_cifrado(nueva_password, salt_cifrado)
+        nueva_clave_email = encryption.derivar_clave_cifrado(nombre_usuario, salt_email)
 
         # Paso 3: Recifrar datos personales y contraseñas almacenadas con la nueva clave
-        email_cifrado_nuevo = encryption.cifrar_aes_gcm(email_descifrado, nueva_clave)
+        email_cifrado_nuevo = encryption.cifrar_aes_gcm(email_descifrado, nueva_clave_email)
         telefono_cifrado_nuevo = encryption.cifrar_aes_gcm(telefono_descifrado, nueva_clave)
 
         # Recifrar cada contraseña con la nueva clave
@@ -480,6 +500,7 @@ class App:
         usuarios[nombre_usuario]['hashed_password'] = hashed_password.decode('utf-8')
         usuarios[nombre_usuario]['salt_password'] = base64.urlsafe_b64encode(salt_password).decode('utf-8')
         usuarios[nombre_usuario]['salt_cifrado'] = base64.urlsafe_b64encode(salt_cifrado).decode('utf-8')
+        usuarios[nombre_usuario]['salt_email'] = base64.urlsafe_b64encode(salt_email).decode('utf-8')
         usuarios[nombre_usuario]['email'] = {
             'cifrado': base64.urlsafe_b64encode(email_cifrado_nuevo['cifrado']).decode('utf-8'),
             'nonce': base64.urlsafe_b64encode(email_cifrado_nuevo['nonce']).decode('utf-8'),
@@ -496,9 +517,10 @@ class App:
 
         # Paso 4: Actualizar la clave de sesión con la nueva clave
         self.clave_sesion = nueva_clave
+        self.clave_email = nueva_clave_email
 
         messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
-        password_restoration.enviar_correo_aviso_cambio_contraseña(nombre_usuario, self.clave_sesion)
+        password_restoration.enviar_correo_aviso_cambio_contraseña(nombre_usuario, self.clave_email)
         self.mostrar_opciones()
 
 

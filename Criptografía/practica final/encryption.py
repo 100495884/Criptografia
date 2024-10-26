@@ -45,6 +45,7 @@ def cifrar_aes_gcm(mensaje: str, clave: bytes, aad: bytes = None) -> dict:
         'tag': tag
     }
 
+
 def descifrar_aes_gcm(cifrado: bytes, clave: bytes, nonce: bytes, tag: bytes, aad: bytes = None) -> str:
     cipher = Cipher(algorithms.AES(clave), modes.GCM(nonce, tag), backend=default_backend())
     decryptor = cipher.decryptor()
