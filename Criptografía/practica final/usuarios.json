@@ -1,24 +1,24 @@
 {
     "pacos": {
-        "salt_password": "p7R2ZfHyHFFCRWc0QBdyOQ==",
-        "salt_cifrado": "cG4bqCElRcqylgPj_FGeUg==",
-        "hashed_password": "7K4vmoGli_NTbBa0y1NSIdHKVUoN9TOHx9JST4VHiKI=",
+        "salt_password": "-RrIyAo4g0U9BcRQuZnsrA==",
+        "salt_cifrado": "0j27P_rjjS5ayE2VI5zlQQ==",
+        "hashed_password": "Q3wVByYvKhXIYmZQJoSKkUzcFOm3nUY0yXNLHBiBrIA=",
         "email": {
-            "cifrado": "b9t3dhs1VCY5Q4g3sn2C9hhemLub9lxNuwM=",
-            "nonce": "ApbzE3iFWPWWzvJk",
-            "tag": "KxpjG8XvKeZoSMxJUYwkSw=="
+            "cifrado": "uLxxsTH1X97mOTG0ZhibeBVWuymGLWuPGLs=",
+            "nonce": "h4OnrnztlBgc88Bd",
+            "tag": "lKNy28Nfuw0nOsCoZMuxFw=="
         },
         "telefono": {
-            "cifrado": "m-vYb4bg4-YE",
-            "nonce": "w6wvw7fgDFK-vDdI",
-            "tag": "7zCiEMwnRCayk9jetrrgcA=="
+            "cifrado": "u_5qU8u9_iNp",
+            "nonce": "NmEjNV6jNh-5z61c",
+            "tag": "44q0TVpguEnjQT3p5mARAw=="
         },
         "contrase\u00f1as": [
             {
-                "asunto": "85675",
-                "contrase\u00f1a": "DKGKajjQJnU=",
-                "nonce": "PrNMX4bKyP74HmYD",
-                "tag": "naubDzLX9VB3mrOBZNEbcg=="
+                "asunto": "234234",
+                "contrase\u00f1a": "INSrwYlYDZBh",
+                "nonce": "cYhQUt8WEkx3XYr3",
+                "tag": "wg6WWfr7xLkrBysAkEl1Pg=="
             }
         ]
     }
