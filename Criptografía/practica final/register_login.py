@@ -37,18 +37,15 @@ def registrar_usuario(nombre_usuario, password, email, telefono):
 
     salt_password = password_hashing.generar_salt()
     salt_cifrado = password_hashing.generar_salt()
-    salt_email = password_hashing.generar_salt()
     hashed_password = password_hashing.hash_password(password, salt_password)
     clave = encryption.derivar_clave_cifrado(password, salt_cifrado)
-    clave_email = encryption.derivar_clave_cifrado(nombre_usuario, salt_email)
 
-    email_cifrado = encryption.cifrar_aes_gcm(email, clave_email)
+    email_cifrado = encryption.cifrar_aes_gcm(email, clave)
     telefono_cifrado = encryption.cifrar_aes_gcm(telefono, clave)
 
     usuarios[nombre_usuario] = {
         'salt_password': base64.urlsafe_b64encode(salt_password).decode('utf-8'),
         'salt_cifrado': base64.urlsafe_b64encode(salt_cifrado).decode('utf-8'),
-        'salt_email': base64.urlsafe_b64encode(salt_email).decode('utf-8'),
         'hashed_password': hashed_password.decode('utf-8'),
         'email': {
             'cifrado': base64.urlsafe_b64encode(email_cifrado['cifrado']).decode('utf-8'),
