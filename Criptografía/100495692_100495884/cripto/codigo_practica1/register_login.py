@@ -4,12 +4,11 @@ import data_validation
 import encryption
 import base64
 from exceptions import ValidationError
-
+import os
 
 # =====================
 # FUNCIONES DE REGISTRO Y AUTENTICACIÓN
 # =====================
-
 def registrar_usuario(nombre_usuario, password, email, telefono):
     """
     Registra un nuevo usuario en el sistema.
@@ -62,6 +61,17 @@ def registrar_usuario(nombre_usuario, password, email, telefono):
     email_cifrado = encryption.cifrar_aes_gcm(email, clave)
     telefono_cifrado = encryption.cifrar_aes_gcm(telefono, clave)
 
+    # Generación de cifrado asimétrico
+    # Cifrar la clave privada con AES-GCM
+    # Generar claves RSA
+    private_key_pem, public_key_pem = encryption.generar_claves_rsa(password)
+
+    # Cifrar la clave privada con AES-GCM
+    private_key_cifrada = encryption.cifrar_aes_gcm(private_key_pem, clave)
+
+    # Asegurarse de que el valor a codificar sea de tipo `bytes`
+    private_key_cifrada_bytes = private_key_cifrada['cifrado']
+
     # Almacenar la información del usuario de manera cifrada y segura
     usuarios[nombre_usuario] = {
         'salt_password': base64.urlsafe_b64encode(salt_password).decode('utf-8'),
@@ -76,7 +86,11 @@ def registrar_usuario(nombre_usuario, password, email, telefono):
             'cifrado': base64.urlsafe_b64encode(telefono_cifrado['cifrado']).decode('utf-8'),
             'nonce': base64.urlsafe_b64encode(telefono_cifrado['nonce']).decode('utf-8'),
             'tag': base64.urlsafe_b64encode(telefono_cifrado['tag']).decode('utf-8')
-        }
+        },
+        'clave_privada': base64.urlsafe_b64encode(private_key_cifrada_bytes).decode('utf-8'),
+        'nonce': base64.urlsafe_b64encode(private_key_cifrada['nonce']).decode('utf-8'),
+        'tag': base64.urlsafe_b64encode(private_key_cifrada['tag']).decode('utf-8'),
+        'clave_publica': base64.urlsafe_b64encode(public_key_pem).decode('utf-8')
     }
 
     # Guardar la información del usuario en el archivo JSON

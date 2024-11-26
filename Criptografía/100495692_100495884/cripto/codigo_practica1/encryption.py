@@ -4,7 +4,11 @@ import logging
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
+
+
+
 
 # =====================
 # FUNCIONES DE CIFRADO Y DESCIFRADO AES-GCM
@@ -51,7 +55,10 @@ def cifrar_aes_gcm(mensaje: str, clave: bytes, aad: bytes = None) -> dict:
     if aad:
         encryptor.authenticate_additional_data(aad)
 
-    cifrado = encryptor.update(mensaje.encode()) + encryptor.finalize()
+    if isinstance(mensaje, bytes):
+        cifrado = encryptor.update(mensaje) + encryptor.finalize()
+    else:
+        cifrado = encryptor.update(mensaje.encode()) + encryptor.finalize()
     tag = encryptor.tag
 
     # Mensajes de depuración para rastrear el proceso de cifrado
@@ -84,3 +91,64 @@ def descifrar_aes_gcm(cifrado: bytes, clave: bytes, nonce: bytes, tag: bytes, aa
     # Mensaje de depuración para confirmar el descifrado exitoso
     logging.debug(f"Descifrado AES realizado. Algoritmo: AES, Longitud de clave: {len(clave) * 8} bits")
     return mensaje_descifrado.decode()
+
+def cifrar_rsa_oaep(mensaje, public_key_pem):
+    """
+    Cifra un mensaje usando RSA-OAEP y la clave pública proporcionada.
+    """
+    public_key = serialization.load_pem_public_key(base64.urlsafe_b64decode(public_key_pem))
+    cifrado = public_key.encrypt(
+        mensaje.encode(),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return base64.urlsafe_b64encode(cifrado).decode('utf-8')
+
+def descifrar_rsa_oaep(cifrado, private_key_pem, password):
+    """
+    Descifra un mensaje cifrado con RSA-OAEP usando la clave privada protegida.
+    """
+    private_key = serialization.load_pem_private_key(
+        base64.urlsafe_b64decode(private_key_pem),
+        password=password.encode()
+    )
+    mensaje = private_key.decrypt(
+        base64.urlsafe_b64decode(cifrado),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return mensaje.decode('utf-8')
+
+import cryptography.hazmat.primitives.asymmetric.rsa as rsa
+import cryptography.hazmat.primitives.serialization as serialization
+
+def generar_claves_rsa(password):
+    # Generar clave privada RSA
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+
+    # Serializar clave privada
+    private_key_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+    )
+
+    # Obtener clave pública de la clave privada
+    public_key = private_key.public_key()
+
+    # Serializar clave pública
+    public_key_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return private_key_pem, public_key_pem

@@ -2,6 +2,7 @@ import base64
 import json_management
 import encryption
 from exceptions import ValidationError
+from digital_signature import firmar_contenido, verificar_firma
 
 
 # =====================
@@ -62,6 +63,13 @@ def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion):
     # Cifrar la contraseña antes de almacenarla
     contraseña_cifrada = encryption.cifrar_aes_gcm(contraseña, clave_sesion)
 
+    # Generar la firma digital de la contraseña
+    private_key_pem = base64.urlsafe_b64decode(user_data['clave_privada'])
+    nonce = base64.urlsafe_b64decode(user_data['nonce'])
+    tag = base64.urlsafe_b64decode(user_data['tag'])
+    private_key_descifrada = encryption.descifrar_aes_gcm(private_key_pem, clave_sesion, nonce, tag)
+    firma = firmar_contenido(private_key_descifrada, clave_sesion, (asunto + contraseña).encode('utf-8'))
+
     # Inicializar la lista de contraseñas si no existe
     if 'contraseñas' not in user_data:
         user_data['contraseñas'] = []
@@ -71,7 +79,8 @@ def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion):
         'asunto': asunto,
         'contraseña': base64.urlsafe_b64encode(contraseña_cifrada['cifrado']).decode('utf-8'),
         'nonce': base64.urlsafe_b64encode(contraseña_cifrada['nonce']).decode('utf-8'),
-        'tag': base64.urlsafe_b64encode(contraseña_cifrada['tag']).decode('utf-8')
+        'tag': base64.urlsafe_b64encode(contraseña_cifrada['tag']).decode('utf-8'),
+        'firma': base64.urlsafe_b64encode(firma).decode('utf-8')
     })
 
     json_management.guardar_usuarios(usuarios)
@@ -93,14 +102,24 @@ def obtener_contraseñas(nombre_usuario, clave):
     user_data = usuarios[nombre_usuario]
     contraseñas_descifradas = []
 
+    public_key_pem = base64.urlsafe_b64decode(user_data['clave_publica'])
+
     # Iterar sobre cada contraseña almacenada y descifrarla
     for item in user_data['contraseñas']:
         contraseña_cifrada = base64.urlsafe_b64decode(item['contraseña'])
         nonce = base64.urlsafe_b64decode(item['nonce'])
         tag = base64.urlsafe_b64decode(item['tag'])
+        firma = base64.urlsafe_b64decode(item['firma'])
+
 
         # Descifrar la contraseña
-        contraseña = encryption.descifrar_aes_gcm(contraseña_cifrada, clave, nonce, tag)
+        contraseña = encryption.descifrar_aes_gcm(contraseña_cifrada, clave, nonce, tag).decode('utf-8')
+
+        # Verificar la firma
+        contenido = item['asunto'] + contraseña.encode('utf-8')
+        if not verificar_firma(public_key_pem, contenido, firma):
+            raise ValidationError(f"La firma de la contraseña para el asunto '{item['asunto']}' no es válida.")
+
         contraseñas_descifradas.append({
             'asunto': item['asunto'],
             'contraseña': contraseña

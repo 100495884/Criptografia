@@ -11,6 +11,8 @@ import data_validation
 import register_login
 import profile_management
 from exceptions import ValidationError
+import os
+import logging
 
 
 # =====================
@@ -495,6 +497,15 @@ class App:
                 'tag': base64.urlsafe_b64encode(contrasena_cifrada['tag']).decode('utf-8')
             })
 
+        # Generar nuevas claves RSA
+        nueva_private_key_pem, nueva_public_key_pem = encryption.generar_claves_rsa(nueva_password)
+
+        # Cifrar la clave privada con AES-GCM
+        nueva_private_key_cifrada = encryption.cifrar_aes_gcm(nueva_private_key_pem, nueva_clave)
+
+        # Asegurarse de que el valor a codificar sea de tipo `bytes`
+        nueva_private_key_cifrada_bytes = nueva_private_key_cifrada['cifrado']
+
         usuarios[nombre_usuario]['hashed_password'] = hashed_password.decode('utf-8')
         usuarios[nombre_usuario]['salt_password'] = base64.urlsafe_b64encode(salt_password).decode('utf-8')
         usuarios[nombre_usuario]['salt_cifrado'] = base64.urlsafe_b64encode(salt_cifrado).decode('utf-8')
@@ -509,6 +520,10 @@ class App:
             'tag': base64.urlsafe_b64encode(telefono_cifrado_nuevo['tag']).decode('utf-8')
         }
         usuarios[nombre_usuario]['contraseñas'] = contraseñas_cifradas_nuevas
+        usuarios[nombre_usuario]['clave_privada'] = base64.urlsafe_b64encode(nueva_private_key_cifrada_bytes).decode('utf-8')
+        usuarios[nombre_usuario]['nonce'] = base64.urlsafe_b64encode(nueva_private_key_cifrada['nonce']).decode('utf-8')
+        usuarios[nombre_usuario]['tag'] = base64.urlsafe_b64encode(nueva_private_key_cifrada['tag']).decode('utf-8')
+        usuarios[nombre_usuario]['clave_publica'] = base64.urlsafe_b64encode(nueva_public_key_pem).decode('utf-8')
 
         # Guardado de la nueva información cifrada
         json_management.guardar_usuarios(usuarios)
@@ -734,6 +749,7 @@ class App:
             self.eliminar_contraseñas()
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
 
 
 # =====================
