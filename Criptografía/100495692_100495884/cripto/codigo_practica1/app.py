@@ -117,6 +117,8 @@ class App:
         # Inicialización de variables de sesión y frames
         self.usuario_actual = None
         self.clave_sesion = None
+        self.private_key_pem = None
+        self.public_key_pem = None
         self.frame_registro = None
         self.frame_login = None
         self.frame_contraseña = None
@@ -274,6 +276,12 @@ class App:
                 user_data = usuarios[nombre_usuario]
                 salt_cifrado = base64.urlsafe_b64decode(user_data['salt_cifrado'])
                 self.clave_sesion = encryption.derivar_clave_cifrado(password, salt_cifrado)
+
+                self.private_key_pem = encryption.descifrar_clave_privada(user_data['clave_privada_cifrada'],
+                                                                                 self.clave_sesion)
+                self.public_key_pem = base64.urlsafe_b64decode(user_data['clave_publica'])
+
+
                 messagebox.showinfo("Éxito", f"Ingreso exitoso como {nombre_usuario}.")
                 self.mostrar_opciones()
         except ValidationError as e:
@@ -322,6 +330,7 @@ class App:
         Cierra la sesión del usuario actual y limpia la clave de sesión.
         """
         self.clave_sesion = None
+        self.private_key_pem = None
         self.master.quit()
 
     def consultar_perfil(self):
@@ -457,18 +466,22 @@ class App:
             return
 
         user_data = usuarios[nombre_usuario]
-        # Recifrado de la información del usuario con la nueva contraseña
-        # (Descifrado de la información antigua)
+
+        # Descifrado de los datos actuales con la clave antigua
+        clave_antigua = self.clave_sesion
         telefono_cifrado = base64.urlsafe_b64decode(user_data['telefono']['cifrado'])
         telefono_nonce = base64.urlsafe_b64decode(user_data['telefono']['nonce'])
         telefono_tag = base64.urlsafe_b64decode(user_data['telefono']['tag'])
+        telefono_descifrado = self.descifrar_dato(telefono_cifrado, telefono_nonce, telefono_tag)
 
         email_cifrado = base64.urlsafe_b64decode(user_data['email']['cifrado'])
         email_nonce = base64.urlsafe_b64decode(user_data['email']['nonce'])
         email_tag = base64.urlsafe_b64decode(user_data['email']['tag'])
-
-        telefono_descifrado = self.descifrar_dato(telefono_cifrado, telefono_nonce, telefono_tag)
         email_descifrado = self.descifrar_dato(email_cifrado, email_nonce, email_tag)
+
+        # Descifrar la clave privada
+        clave_privada_cifrada = user_data['clave_privada_cifrada']
+        clave_privada_pem = encryption.descifrar_clave_privada(clave_privada_cifrada, clave_antigua)
 
         contraseñas_descifradas = []
         for contraseña in user_data.get('contraseñas', []):
@@ -478,12 +491,13 @@ class App:
             contrasena_descifrada = self.descifrar_dato(contraseña_cifrada, nonce, tag)
             contraseñas_descifradas.append((contraseña['asunto'], contrasena_descifrada))
 
-        # (Cifrado con la nueva clave)
+        # Generar nueva clave y salts
         salt_password = password_hashing.generar_salt()
         salt_cifrado = password_hashing.generar_salt()
         hashed_password = password_hashing.hash_password(nueva_password, salt_password)
         nueva_clave = encryption.derivar_clave_cifrado(nueva_password, salt_cifrado)
 
+        # Recifrar los datos con la nueva clave
         email_cifrado_nuevo = encryption.cifrar_aes_gcm(email_descifrado, nueva_clave)
         telefono_cifrado_nuevo = encryption.cifrar_aes_gcm(telefono_descifrado, nueva_clave)
 
@@ -497,15 +511,10 @@ class App:
                 'tag': base64.urlsafe_b64encode(contrasena_cifrada['tag']).decode('utf-8')
             })
 
-        # Generar nuevas claves RSA
-        nueva_private_key_pem, nueva_public_key_pem = encryption.generar_claves_rsa(nueva_password)
+        # Recifrar la clave privada con la nueva clave
+        clave_privada_cifrada_nueva = encryption.cifrar_aes_gcm(clave_privada_pem, nueva_clave)
 
-        # Cifrar la clave privada con AES-GCM
-        nueva_private_key_cifrada = encryption.cifrar_aes_gcm(nueva_private_key_pem, nueva_clave)
-
-        # Asegurarse de que el valor a codificar sea de tipo `bytes`
-        nueva_private_key_cifrada_bytes = nueva_private_key_cifrada['cifrado']
-
+        # Guardar los nuevos datos del usuario
         usuarios[nombre_usuario]['hashed_password'] = hashed_password.decode('utf-8')
         usuarios[nombre_usuario]['salt_password'] = base64.urlsafe_b64encode(salt_password).decode('utf-8')
         usuarios[nombre_usuario]['salt_cifrado'] = base64.urlsafe_b64encode(salt_cifrado).decode('utf-8')
@@ -520,15 +529,16 @@ class App:
             'tag': base64.urlsafe_b64encode(telefono_cifrado_nuevo['tag']).decode('utf-8')
         }
         usuarios[nombre_usuario]['contraseñas'] = contraseñas_cifradas_nuevas
-        usuarios[nombre_usuario]['clave_privada'] = base64.urlsafe_b64encode(nueva_private_key_cifrada_bytes).decode('utf-8')
-        usuarios[nombre_usuario]['nonce'] = base64.urlsafe_b64encode(nueva_private_key_cifrada['nonce']).decode('utf-8')
-        usuarios[nombre_usuario]['tag'] = base64.urlsafe_b64encode(nueva_private_key_cifrada['tag']).decode('utf-8')
-        usuarios[nombre_usuario]['clave_publica'] = base64.urlsafe_b64encode(nueva_public_key_pem).decode('utf-8')
+        usuarios[nombre_usuario]['clave_privada_cifrada'] = {
+            'cifrado': base64.urlsafe_b64encode(clave_privada_cifrada_nueva['cifrado']).decode('utf-8'),
+            'nonce': base64.urlsafe_b64encode(clave_privada_cifrada_nueva['nonce']).decode('utf-8'),
+            'tag': base64.urlsafe_b64encode(clave_privada_cifrada_nueva['tag']).decode('utf-8')
+        }
 
-        # Guardado de la nueva información cifrada
+        # Guardar los cambios en el archivo JSON
         json_management.guardar_usuarios(usuarios)
 
-        # Aviso de éxito y retorno a la pantalla de opciones
+        # Actualizar la clave de sesión y mostrar mensaje de éxito
         self.clave_sesion = nueva_clave
         password_restoration.enviar_correo_aviso_cambio_contraseña(nombre_usuario, nueva_clave)
         messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
@@ -619,7 +629,7 @@ class App:
         Muestra la pantalla para gestionar las contraseñas almacenadas.
         Permite mostrar u ocultar las contraseñas individuales.
         """
-        contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion)
+        contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion, self.public_key_pem)
 
         self.limpiar_frame()
         self.frame_gestionar_contraseñas = ttk.Frame(self.master)
@@ -684,7 +694,7 @@ class App:
         Muestra la pantalla para eliminar contraseñas.
         Lista todas las contraseñas almacenadas con la opción de eliminarlas individualmente.
         """
-        contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion)
+        contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion, self.public_key_pem)
 
         self.limpiar_frame()
         self.frame_eliminar_contraseñas = ttk.Frame(self.master)
@@ -730,7 +740,7 @@ class App:
 
         try:
             # Guarda la contraseña en el sistema
-            profile_management.guardar_contraseña(self.usuario_actual, asunto, contraseña, self.clave_sesion)
+            profile_management.guardar_contraseña(self.usuario_actual, asunto, contraseña, self.clave_sesion, self.private_key_pem)
             messagebox.showinfo("Éxito", "Contraseña guardada exitosamente.")
             self.administrar_contraseñas()
         except Exception as e:

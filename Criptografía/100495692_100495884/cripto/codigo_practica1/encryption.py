@@ -6,6 +6,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
+import cryptography.hazmat.primitives.asymmetric.rsa as rsa
+import cryptography.hazmat.primitives.serialization as serialization
 
 
 
@@ -125,30 +127,61 @@ def descifrar_rsa_oaep(cifrado, private_key_pem, password):
     )
     return mensaje.decode('utf-8')
 
-import cryptography.hazmat.primitives.asymmetric.rsa as rsa
-import cryptography.hazmat.primitives.serialization as serialization
 
-def generar_claves_rsa(password):
+def generar_claves_rsa(clave_sesion):
+    """
+    Genera un par de claves RSA y cifra la clave privada usando AES-GCM con una clave de sesión.
+
+    :param password: Contraseña del usuario, utilizada para derivar la clave privada.
+    :param clave_sesion: Clave simétrica utilizada para cifrar la clave privada RSA.
+    :return: Un diccionario con la clave privada cifrada y la clave pública.
+    """
     # Generar clave privada RSA
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048
     )
 
-    # Serializar clave privada
+    # Serializar clave privada en formato PEM
     private_key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+        encryption_algorithm=serialization.NoEncryption()  # Sin cifrar inicialmente
     )
 
-    # Obtener clave pública de la clave privada
+    # Serializar clave pública en formato PEM
     public_key = private_key.public_key()
-
-    # Serializar clave pública
     public_key_pem = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
-    return private_key_pem, public_key_pem
+    # Cifrar la clave privada con AES-GCM
+    private_key_cifrada = cifrar_aes_gcm(private_key_pem, clave_sesion)
+
+    return {
+        'clave_privada_cifrada': {
+            'cifrado': base64.urlsafe_b64encode(private_key_cifrada['cifrado']).decode('utf-8'),
+            'nonce': base64.urlsafe_b64encode(private_key_cifrada['nonce']).decode('utf-8'),
+            'tag': base64.urlsafe_b64encode(private_key_cifrada['tag']).decode('utf-8')
+        },
+        'clave_publica': base64.urlsafe_b64encode(public_key_pem).decode('utf-8')
+    }
+
+
+def descifrar_clave_privada(clave_privada_cifrada, clave_sesion):
+    """
+    Descifra una clave privada RSA que ha sido cifrada con AES-GCM.
+
+    :param clave_privada_cifrada: Diccionario con los datos cifrados, el nonce y la etiqueta (tag).
+    :param clave_sesion: Clave simétrica utilizada para descifrar la clave privada RSA.
+    :return: La clave privada en formato PEM.
+    """
+    cifrado = base64.urlsafe_b64decode(clave_privada_cifrada['cifrado'])
+    nonce = base64.urlsafe_b64decode(clave_privada_cifrada['nonce'])
+    tag = base64.urlsafe_b64decode(clave_privada_cifrada['tag'])
+
+    # Descifrar la clave privada
+    private_key_pem = descifrar_aes_gcm(cifrado, clave_sesion, nonce, tag)
+
+    return private_key_pem

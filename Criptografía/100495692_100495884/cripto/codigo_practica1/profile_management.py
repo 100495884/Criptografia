@@ -2,7 +2,7 @@ import base64
 import json_management
 import encryption
 from exceptions import ValidationError
-from digital_signature import firmar_contenido, verificar_firma
+from digital_signature import generar_firma_digital, verificar_firma_digital
 
 
 # =====================
@@ -45,14 +45,10 @@ def consultar_usuario(nombre_usuario, clave):
     }
 
 
-def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion):
+def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion, private_key_pem):
     """
-    Guarda una nueva contraseña asociada a un usuario con un asunto específico.
-
-    - Cifra la contraseña utilizando la clave de sesión proporcionada.
-    - Si el usuario no tiene contraseñas almacenadas, inicializa la lista.
-    - Almacena la contraseña cifrada junto con el asunto en la lista de contraseñas del usuario.
-    - Guarda los datos actualizados en el archivo JSON.
+    Guarda una nueva contraseña asociada a un usuario.
+    Cifra la contraseña y genera una firma digital para garantizar su autenticidad.
     """
     usuarios = json_management.cargar_usuarios()
     if nombre_usuario not in usuarios:
@@ -60,65 +56,66 @@ def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion):
 
     user_data = usuarios[nombre_usuario]
 
-    # Cifrar la contraseña antes de almacenarla
+    # Cifrar la contraseña
     contraseña_cifrada = encryption.cifrar_aes_gcm(contraseña, clave_sesion)
 
-    # Generar la firma digital de la contraseña
-    private_key_pem = base64.urlsafe_b64decode(user_data['clave_privada'])
-    nonce = base64.urlsafe_b64decode(user_data['nonce'])
-    tag = base64.urlsafe_b64decode(user_data['tag'])
-    private_key_descifrada = encryption.descifrar_aes_gcm(private_key_pem, clave_sesion, nonce, tag)
-    firma = firmar_contenido(private_key_descifrada, clave_sesion, (asunto + contraseña).encode('utf-8'))
+    # Generar la firma digital para esta contraseña
+    datos_a_firmar = {
+        "asunto": asunto,
+        "contraseña": base64.urlsafe_b64encode(contraseña_cifrada['cifrado']).decode('utf-8')
+    }
+    print(1)
+    firma = generar_firma_digital(datos_a_firmar, private_key_pem)
+    print(2)
 
     # Inicializar la lista de contraseñas si no existe
     if 'contraseñas' not in user_data:
         user_data['contraseñas'] = []
 
-    # Añadir la nueva contraseña cifrada a la lista
+    # Guardar la contraseña cifrada con su firma
     user_data['contraseñas'].append({
         'asunto': asunto,
         'contraseña': base64.urlsafe_b64encode(contraseña_cifrada['cifrado']).decode('utf-8'),
         'nonce': base64.urlsafe_b64encode(contraseña_cifrada['nonce']).decode('utf-8'),
         'tag': base64.urlsafe_b64encode(contraseña_cifrada['tag']).decode('utf-8'),
-        'firma': base64.urlsafe_b64encode(firma).decode('utf-8')
+        'firma': firma  # Guardar la firma
     })
 
+    # Guardar los datos actualizados
     json_management.guardar_usuarios(usuarios)
 
 
-def obtener_contraseñas(nombre_usuario, clave):
+def obtener_contraseñas(nombre_usuario, clave, public_key_pem):
     """
-    Recupera y descifra todas las contraseñas asociadas a un usuario.
-
-    - Verifica si el usuario tiene contraseñas almacenadas.
-    - Descifra cada contraseña utilizando la clave proporcionada.
-
-    Devuelve una lista de contraseñas descifradas con sus respectivos asuntos.
+    Recupera y descifra todas las contraseñas asociadas a un usuario, verificando sus firmas digitales.
     """
     usuarios = json_management.cargar_usuarios()
     if nombre_usuario not in usuarios or 'contraseñas' not in usuarios[nombre_usuario]:
         return []
 
+    # Asegurar que public_key_pem está en bytes
+    if isinstance(public_key_pem, str):
+        public_key_pem = public_key_pem.encode()
+
     user_data = usuarios[nombre_usuario]
     contraseñas_descifradas = []
 
-    public_key_pem = base64.urlsafe_b64decode(user_data['clave_publica'])
-
-    # Iterar sobre cada contraseña almacenada y descifrarla
+    # Iterar sobre cada contraseña almacenada
     for item in user_data['contraseñas']:
+        datos_a_verificar = {
+            "asunto": item['asunto'],
+            "contraseña": item['contraseña']
+        }
+
+        # Verificar la firma
+        if not verificar_firma_digital(datos_a_verificar, item['firma'], public_key_pem):
+            raise ValidationError(f"La firma de la contraseña con asunto '{item['asunto']}' no es válida.")
+
+        # Descifrar la contraseña
         contraseña_cifrada = base64.urlsafe_b64decode(item['contraseña'])
         nonce = base64.urlsafe_b64decode(item['nonce'])
         tag = base64.urlsafe_b64decode(item['tag'])
-        firma = base64.urlsafe_b64decode(item['firma'])
-
-
-        # Descifrar la contraseña
-        contraseña = encryption.descifrar_aes_gcm(contraseña_cifrada, clave, nonce, tag).decode('utf-8')
-
-        # Verificar la firma
-        contenido = item['asunto'] + contraseña.encode('utf-8')
-        if not verificar_firma(public_key_pem, contenido, firma):
-            raise ValidationError(f"La firma de la contraseña para el asunto '{item['asunto']}' no es válida.")
+        contraseña = encryption.descifrar_aes_gcm(contraseña_cifrada, clave, nonce, tag)
 
         contraseñas_descifradas.append({
             'asunto': item['asunto'],
@@ -126,6 +123,8 @@ def obtener_contraseñas(nombre_usuario, clave):
         })
 
     return contraseñas_descifradas
+
+
 
 
 def eliminar_contraseña(nombre_usuario, asunto):
