@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import (
@@ -7,10 +8,13 @@ from cryptography.hazmat.primitives.serialization import (
     load_pem_public_key
 )
 
+# Configuración del sistema de logging para mostrar mensajes de depuración
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
 
 def generar_firma_digital(datos, private_key_pem):
     """
     Genera una firma digital para un conjunto de datos.
+
     :param datos: Datos a firmar (deben ser un diccionario serializable a JSON).
     :param private_key_pem: Clave privada en formato PEM para firmar.
     :return: La firma digital en formato base64.
@@ -38,8 +42,10 @@ def generar_firma_digital(datos, private_key_pem):
         hashes.SHA256()
     )
 
+    # Logging de depuración
+    logging.debug(f"Firma generada: {firma.hex()}")  # Representación de la firma en hexadecimal
+
     # Retornar la firma en formato base64
-    print(firma)  # Debug: Verifica la firma generada
     return base64.urlsafe_b64encode(firma).decode('utf-8')
 
 
@@ -69,7 +75,8 @@ def verificar_firma_digital(datos, firma, public_key_pem):
             ),
             hashes.SHA256()
         )
+        logging.debug("Firma verificada con éxito.")  # Logging en caso de éxito
         return True
     except Exception as e:
-        print(f"Error al verificar la firma: {e}")  # Debug
+        logging.error(f"Error al verificar la firma: {e}")  # Logging en caso de error
         return False

@@ -3,6 +3,7 @@ import json_management
 import encryption
 from exceptions import ValidationError
 from digital_signature import generar_firma_digital, verificar_firma_digital
+from certificate_management import validar_certificado
 
 
 # =====================
@@ -64,9 +65,7 @@ def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion, priva
         "asunto": asunto,
         "contraseña": base64.urlsafe_b64encode(contraseña_cifrada['cifrado']).decode('utf-8')
     }
-    print(1)
     firma = generar_firma_digital(datos_a_firmar, private_key_pem)
-    print(2)
 
     # Inicializar la lista de contraseñas si no existe
     if 'contraseñas' not in user_data:
@@ -85,7 +84,7 @@ def guardar_contraseña(nombre_usuario, asunto, contraseña, clave_sesion, priva
     json_management.guardar_usuarios(usuarios)
 
 
-def obtener_contraseñas(nombre_usuario, clave, public_key_pem):
+def obtener_contraseñas(nombre_usuario, clave, public_key_pem, ca_cert_pem):
     """
     Recupera y descifra todas las contraseñas asociadas a un usuario, verificando sus firmas digitales.
     """
@@ -98,6 +97,12 @@ def obtener_contraseñas(nombre_usuario, clave, public_key_pem):
         public_key_pem = public_key_pem.encode()
 
     user_data = usuarios[nombre_usuario]
+    user_cert_pem = base64.urlsafe_b64decode(user_data.get('certificado', ''))
+
+    # Validar el certificado del usuario
+    if not validar_certificado(user_cert_pem, ca_cert_pem):
+        raise ValidationError("Tu certificado no es válido o no ha sido emitido por la CA.")
+
     contraseñas_descifradas = []
 
     # Iterar sobre cada contraseña almacenada

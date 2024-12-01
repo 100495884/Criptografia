@@ -10,9 +10,10 @@ import json_management
 import data_validation
 import register_login
 import profile_management
+import certificate_management
 from exceptions import ValidationError
-import os
-import logging
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
 
 
 # =====================
@@ -114,6 +115,23 @@ class App:
         self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=master.quit, style="Secondary.TButton")
         self.boton_salir.pack(pady=15)
 
+        # Cargar o generar la CA
+        try:
+            with open("ca_key.pem", "rb") as f:
+                ca_private_key_bytes = f.read()
+                self.ca_private_key = load_pem_private_key(ca_private_key_bytes, password=None)
+            with open("ca_cert.pem", "rb") as f:
+                self.ca_cert = f.read()
+        except FileNotFoundError:
+            ca_private_key, ca_cert = certificate_management.generar_ca()
+            self.ca_private_key = load_pem_private_key(ca_private_key, password=None)
+            self.ca_cert = ca_cert
+            with open("ca_key.pem", "wb") as f:
+                f.write(ca_private_key)
+            with open("ca_cert.pem", "wb") as f:
+                f.write(ca_cert)
+
+
         # Inicialización de variables de sesión y frames
         self.usuario_actual = None
         self.clave_sesion = None
@@ -132,6 +150,7 @@ class App:
         self.frame_eliminar_contraseña = None
         self.frame_mostrar_contraseña = None
         self.frame_administrar_contraseña = None
+        self.frame_solicitar_certificado = None
 
     def limpiar_frame(self):
         """
@@ -319,7 +338,7 @@ class App:
         self.boton_cambiar_contraseña = ttk.Button(self.opciones_frame, text="Cambiar Contraseña", command=self.mostrar_cambiar_contraseña)
         self.boton_cambiar_contraseña.pack(pady=15)
 
-        self.boton_administrar_contraseñas = ttk.Button(self.opciones_frame, text="Administrar Contraseñas", command=self.administrar_contraseñas)
+        self.boton_administrar_contraseñas = ttk.Button(self.opciones_frame, text="Administrar Contraseñas", command=self.check_certificado)
         self.boton_administrar_contraseñas.pack(pady=15)
 
         self.boton_cerrar_sesion = ttk.Button(self.opciones_frame, text="Cerrar Sesión", command=self.cerrar_sesion, style="Secondary.TButton")
@@ -544,6 +563,58 @@ class App:
         messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
         self.mostrar_opciones()
 
+    def check_certificado(self):
+        """
+        Muestra la pantalla para administrar las contraseñas almacenadas.
+        Verifica si el usuario tiene un certificado válido; si no, permite solicitarlo.
+        """
+        usuarios = json_management.cargar_usuarios()
+        user_data = usuarios.get(self.usuario_actual)
+
+        if 'certificado' not in user_data:
+            # Mostrar mensaje y botón para solicitar certificado
+            self.limpiar_frame()
+            self.frame_solicitar_certificado = ttk.Frame(self.master)
+            self.frame_solicitar_certificado.pack()
+
+            ttk.Label(self.frame_solicitar_certificado,
+                      text="Para administrar contraseñas, necesitas un certificado firmado.").pack(pady=10)
+            ttk.Button(
+                self.frame_solicitar_certificado,
+                text="Solicitar Certificado",
+                command=self.solicitar_certificado
+            ).pack(pady=10)
+
+            ttk.Button(
+                self.frame_solicitar_certificado,
+                text="Volver",
+                command=self.mostrar_opciones,
+                style="Secondary.TButton"
+            ).pack(pady=10)
+        else:
+            # Continuar con la funcionalidad normal si el usuario ya tiene un certificado
+            self.administrar_contraseñas()
+
+
+    def solicitar_certificado(self):
+        """
+        Genera y guarda un certificado para el usuario actual, firmado por la CA.
+        """
+        usuarios = json_management.cargar_usuarios()
+        user_data = usuarios[self.usuario_actual]
+
+        # Generar el certificado para el usuario
+        user_public_key_pem = base64.urlsafe_b64decode(user_data['clave_publica'])
+        user_cert_pem = certificate_management.emitir_certificado(user_public_key_pem, self.ca_private_key, self.ca_cert)
+
+        # Guardar el certificado en el sistema
+        user_data['certificado'] = base64.urlsafe_b64encode(user_cert_pem).decode('utf-8')
+        json_management.guardar_usuarios(usuarios)
+
+        # Mostrar mensaje de éxito
+        messagebox.showinfo("Éxito", "Tu certificado ha sido generado y asociado a tu cuenta.")
+        self.administrar_contraseñas()
+
     def administrar_contraseñas(self):
         """
         Muestra la pantalla para administrar las contraseñas almacenadas.
@@ -629,7 +700,13 @@ class App:
         Muestra la pantalla para gestionar las contraseñas almacenadas.
         Permite mostrar u ocultar las contraseñas individuales.
         """
-        contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion, self.public_key_pem)
+        try:
+            contraseñas = profile_management.obtener_contraseñas(
+                self.usuario_actual, self.clave_sesion, self.public_key_pem, self.ca_cert
+            )
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+            return
 
         self.limpiar_frame()
         self.frame_gestionar_contraseñas = ttk.Frame(self.master)
@@ -638,7 +715,6 @@ class App:
         if contraseñas:
             self.contraseñas_visibles = {}
 
-            # Muestra cada contraseña en la lista con la opción de mostrar/ocultar
             for idx, contraseña in enumerate(contraseñas):
                 ttk.Label(self.frame_gestionar_contraseñas, text=f"Asunto: {contraseña['asunto']}").pack()
 
@@ -652,7 +728,6 @@ class App:
                 boton_mostrar = ttk.Button(frame_contraseña, text="Mostrar")
                 boton_mostrar.pack(side="left", padx=5)
 
-                # Configura el botón para mostrar u ocultar la contraseña
                 boton_mostrar.config(
                     command=lambda i=idx, lbl=label_contraseña, btn=boton_mostrar, contra=contraseña['contraseña']:
                     self.mostrar_ocultar_contraseña(i, lbl, btn, contra)
@@ -660,7 +735,6 @@ class App:
         else:
             ttk.Label(self.frame_gestionar_contraseñas, text="No hay contraseñas guardadas.").pack()
 
-        # Botón para volver a la pantalla de administración de contraseñas
         self.boton_volver = ttk.Button(
             self.frame_gestionar_contraseñas,
             text="Volver",
@@ -694,14 +768,19 @@ class App:
         Muestra la pantalla para eliminar contraseñas.
         Lista todas las contraseñas almacenadas con la opción de eliminarlas individualmente.
         """
-        contraseñas = profile_management.obtener_contraseñas(self.usuario_actual, self.clave_sesion, self.public_key_pem)
+        try:
+            contraseñas = profile_management.obtener_contraseñas(
+                self.usuario_actual, self.clave_sesion, self.public_key_pem, self.ca_cert
+            )
+        except ValidationError as e:
+            messagebox.showerror("Error", str(e))
+            return
 
         self.limpiar_frame()
         self.frame_eliminar_contraseñas = ttk.Frame(self.master)
         self.frame_eliminar_contraseñas.pack()
 
         if contraseñas:
-            # Muestra cada contraseña con la opción de eliminarla
             for contraseña in contraseñas:
                 frame_contraseña = ttk.Frame(self.frame_eliminar_contraseñas)
                 frame_contraseña.pack()
@@ -716,7 +795,6 @@ class App:
         else:
             ttk.Label(self.frame_eliminar_contraseñas, text="No hay contraseñas guardadas.").pack()
 
-        # Botón para volver a la pantalla de administración de contraseñas
         self.boton_volver = ttk.Button(
             self.frame_eliminar_contraseñas,
             text="Volver",
