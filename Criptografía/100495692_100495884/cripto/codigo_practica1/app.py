@@ -1,7 +1,9 @@
 import base64
 import tkinter as tk
+import json
 from tkinter import messagebox
 from tkinter import ttk
+from tkinter.simpledialog import askstring
 
 import password_hashing
 import password_restoration
@@ -115,28 +117,24 @@ class App:
         self.boton_salir = ttk.Button(self.menu_frame, text="Salir", command=master.quit, style="Secondary.TButton")
         self.boton_salir.pack(pady=15)
 
-        # Cargar o generar la CA
-        try:
-            with open("ca_key.pem", "rb") as f:
-                ca_private_key_bytes = f.read()
-                self.ca_private_key = load_pem_private_key(ca_private_key_bytes, password=None)
-            with open("ca_cert.pem", "rb") as f:
-                self.ca_cert = f.read()
-        except FileNotFoundError:
-            ca_private_key, ca_cert = certificate_management.generar_ca()
-            self.ca_private_key = load_pem_private_key(ca_private_key, password=None)
-            self.ca_cert = ca_cert
-            with open("ca_key.pem", "wb") as f:
-                f.write(ca_private_key)
-            with open("ca_cert.pem", "wb") as f:
-                f.write(ca_cert)
+        # Verificar si la CA ya existe o solicitar contraseña para crearla
+        self.ca_private_key = None
+        self.ca_cert = None
 
+        # Cargar los datos de la CA
+        self.cargar_datos_ca()
 
+        # Si no se cargaron los datos, crear la CA
+        if not self.ca_private_key or not self.ca_cert:
+            messagebox.showinfo("Atención", "El certificado raíz no existe. Vamos a crearlo.")
+            self.crear_certificado_raiz()
         # Inicialización de variables de sesión y frames
         self.usuario_actual = None
         self.clave_sesion = None
         self.private_key_pem = None
         self.public_key_pem = None
+        self.ca_private_key = None
+        self.ca_cert = None
         self.frame_registro = None
         self.frame_login = None
         self.frame_contraseña = None
@@ -159,6 +157,154 @@ class App:
         """
         for widget in self.master.winfo_children():
             widget.destroy()
+
+    def crear_certificado_raiz(self):
+        """
+        Crea el certificado raíz (CA) pidiendo al usuario una contraseña maestra.
+        """
+        master_password = askstring("Contraseña de Administrador", "Introduce una contraseña maestra para la CA:",
+                                    show='*')
+        if not master_password:
+            messagebox.showerror("Error", "La contraseña maestra es obligatoria para crear el certificado raíz.")
+            return
+
+        try:
+            # Generar la CA
+            resultado_ca = certificate_management.generar_ca(master_password)
+            self.ca_private_key = resultado_ca['private_key']
+            self.ca_cert = resultado_ca['certificado']
+
+            # Guardar en archivos
+            with open("ca_key.json", "w") as f:
+                json.dump({
+                    'cifrado': base64.b64encode(self.ca_private_key['cifrado']).decode('utf-8'),
+                    'nonce': base64.b64encode(self.ca_private_key['nonce']).decode('utf-8'),
+                    'tag': base64.b64encode(self.ca_private_key['tag']).decode('utf-8'),
+                    'salt': base64.b64encode(self.ca_private_key['salt']).decode('utf-8'),
+                }, f)
+                print("DEBUG: Clave privada guardada en ca_key.json")
+
+            with open("ca_cert.pem", "wb") as f:
+                f.write(self.ca_cert)
+                print("DEBUG: Certificado guardado en ca_cert.pem")
+
+            # Cargar nuevamente las variables desde los archivos
+            self.cargar_datos_ca()
+
+            messagebox.showinfo("Éxito", "Certificado raíz creado exitosamente.")
+        except Exception as e:
+            self.ca_private_key = None
+            self.ca_cert = None
+            print("DEBUG: Error al crear la CA:", str(e))
+            messagebox.showerror("Error", f"No se pudo crear el certificado raíz: {e}")
+
+    def cargar_datos_ca(self):
+        """
+        Carga los datos del certificado raíz y la clave privada desde los archivos.
+        """
+        try:
+            # Cargar clave privada de la CA
+            with open("ca_key.json", "r") as f:
+                ca_key_data = json.load(f)
+                self.ca_private_key = {
+                    'cifrado': base64.b64decode(ca_key_data['cifrado']),
+                    'nonce': base64.b64decode(ca_key_data['nonce']),
+                    'tag': base64.b64decode(ca_key_data['tag']),
+                    'salt': base64.b64decode(ca_key_data['salt']),
+                }
+                print("DEBUG: Clave privada cargada desde ca_key.json:", self.ca_private_key)
+
+            # Cargar el certificado raíz
+            with open("ca_cert.pem", "rb") as f:
+                self.ca_cert = f.read()
+                print("DEBUG: Certificado CA cargado desde ca_cert.pem:", self.ca_cert)
+
+        except FileNotFoundError as e:
+            self.ca_private_key = None
+            self.ca_cert = None
+            print(f"DEBUG: Archivos no encontrados: {e}")
+        except Exception as e:
+            self.ca_private_key = None
+            self.ca_cert = None
+            print(f"DEBUG: Error al cargar los datos de la CA: {e}")
+
+    def check_certificado(self):
+        """
+        Comprueba si el usuario tiene un certificado válido.
+        Si no lo tiene, solicita la contraseña maestra para generarlo.
+        """
+        usuarios = json_management.cargar_usuarios()
+        user_data = usuarios.get(self.usuario_actual)
+
+        if 'certificado' not in user_data:
+            self.limpiar_frame()
+            self.frame_solicitar_certificado = ttk.Frame(self.master)
+            self.frame_solicitar_certificado.pack()
+
+            ttk.Label(self.frame_solicitar_certificado, text="Necesitas un certificado firmado para continuar.").pack(
+                pady=10)
+            ttk.Button(
+                self.frame_solicitar_certificado,
+                text="Solicitar Certificado",
+                command=self.solicitar_certificado
+            ).pack(pady=10)
+
+            ttk.Button(
+                self.frame_solicitar_certificado,
+                text="Volver",
+                command=self.mostrar_opciones,
+                style="Secondary.TButton"
+            ).pack(pady=10)
+        else:
+            self.administrar_contraseñas()
+
+    def solicitar_certificado(self):
+        try:
+            # Validar la CA
+            self.cargar_datos_ca()
+            print("DEBUG: Validando la CA antes de proceder")
+            print("DEBUG: Clave privada antes de descifrar:", self.ca_private_key)
+            print("DEBUG: Certificado CA:", self.ca_cert)
+            if not self.ca_private_key or not self.ca_cert:
+                raise ValueError("El certificado raíz o la clave privada no están disponibles.")
+
+            # Pedir la contraseña de administrador
+            master_password = certificate_management.pedir_contraseña_admin()
+            if not master_password:
+                raise ValueError("Contraseña de administrador no ingresada.")
+
+            # Emitir certificado
+            usuarios = json_management.cargar_usuarios()
+            user_data = usuarios.get(self.usuario_actual)
+            if not user_data:
+                raise KeyError(f"Usuario '{self.usuario_actual}' no encontrado en la base de datos.")
+
+            if 'clave_publica' not in user_data:
+                raise ValueError(f"El usuario '{self.usuario_actual}' no tiene una clave pública registrada.")
+
+            user_public_key_pem = base64.urlsafe_b64decode(user_data['clave_publica'])
+            user_cert_pem = certificate_management.emitir_certificado(
+                user_public_key_pem,
+                self.ca_private_key,
+                self.ca_cert,
+                master_password
+            )
+
+            # Guardar el certificado del usuario
+            user_data['certificado'] = base64.urlsafe_b64encode(user_cert_pem).decode('utf-8')
+            json_management.guardar_usuarios(usuarios)
+
+            messagebox.showinfo("Éxito", "Certificado generado exitosamente.")
+            self.administrar_contraseñas()
+        except ValueError as ve:
+            print(f"DEBUG: Error de validación - {ve}")
+            messagebox.showerror("Error", f"Validación fallida: {ve}")
+        except KeyError as ke:
+            print(f"DEBUG: Error de datos - {ke}")
+            messagebox.showerror("Error", f"Error de datos: {ke}")
+        except Exception as e:
+            print(f"DEBUG: Excepción inesperada - {e}")
+            messagebox.showerror("Error", f"No se pudo solicitar el certificado: {e}")
 
     def volver_menu(self):
         """
@@ -563,57 +709,6 @@ class App:
         messagebox.showinfo("Éxito", "Contraseña cambiada exitosamente.")
         self.mostrar_opciones()
 
-    def check_certificado(self):
-        """
-        Muestra la pantalla para administrar las contraseñas almacenadas.
-        Verifica si el usuario tiene un certificado válido; si no, permite solicitarlo.
-        """
-        usuarios = json_management.cargar_usuarios()
-        user_data = usuarios.get(self.usuario_actual)
-
-        if 'certificado' not in user_data:
-            # Mostrar mensaje y botón para solicitar certificado
-            self.limpiar_frame()
-            self.frame_solicitar_certificado = ttk.Frame(self.master)
-            self.frame_solicitar_certificado.pack()
-
-            ttk.Label(self.frame_solicitar_certificado,
-                      text="Para administrar contraseñas, necesitas un certificado firmado.").pack(pady=10)
-            ttk.Button(
-                self.frame_solicitar_certificado,
-                text="Solicitar Certificado",
-                command=self.solicitar_certificado
-            ).pack(pady=10)
-
-            ttk.Button(
-                self.frame_solicitar_certificado,
-                text="Volver",
-                command=self.mostrar_opciones,
-                style="Secondary.TButton"
-            ).pack(pady=10)
-        else:
-            # Continuar con la funcionalidad normal si el usuario ya tiene un certificado
-            self.administrar_contraseñas()
-
-
-    def solicitar_certificado(self):
-        """
-        Genera y guarda un certificado para el usuario actual, firmado por la CA.
-        """
-        usuarios = json_management.cargar_usuarios()
-        user_data = usuarios[self.usuario_actual]
-
-        # Generar el certificado para el usuario
-        user_public_key_pem = base64.urlsafe_b64decode(user_data['clave_publica'])
-        user_cert_pem = certificate_management.emitir_certificado(user_public_key_pem, self.ca_private_key, self.ca_cert)
-
-        # Guardar el certificado en el sistema
-        user_data['certificado'] = base64.urlsafe_b64encode(user_cert_pem).decode('utf-8')
-        json_management.guardar_usuarios(usuarios)
-
-        # Mostrar mensaje de éxito
-        messagebox.showinfo("Éxito", "Tu certificado ha sido generado y asociado a tu cuenta.")
-        self.administrar_contraseñas()
 
     def administrar_contraseñas(self):
         """

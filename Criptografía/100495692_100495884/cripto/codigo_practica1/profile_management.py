@@ -3,7 +3,7 @@ import json_management
 import encryption
 from exceptions import ValidationError
 from digital_signature import generar_firma_digital, verificar_firma_digital
-from certificate_management import validar_certificado
+import certificate_management
 
 
 # =====================
@@ -100,8 +100,8 @@ def obtener_contraseñas(nombre_usuario, clave, public_key_pem, ca_cert_pem):
     user_cert_pem = base64.urlsafe_b64decode(user_data.get('certificado', ''))
 
     # Validar el certificado del usuario
-    if not validar_certificado(user_cert_pem, ca_cert_pem):
-        raise ValidationError("Tu certificado no es válido o no ha sido emitido por la CA.")
+    #if not validar_certificado(user_cert_pem, ca_cert_pem):
+    #    raise ValidationError("Tu certificado no es válido o no ha sido emitido por la CA.")
 
     contraseñas_descifradas = []
 
