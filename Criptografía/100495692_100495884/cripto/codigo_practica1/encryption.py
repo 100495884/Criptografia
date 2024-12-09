@@ -94,39 +94,6 @@ def descifrar_aes_gcm(cifrado: bytes, clave: bytes, nonce: bytes, tag: bytes, aa
     logging.debug(f"Descifrado AES realizado. Algoritmo: AES, Longitud de clave: {len(clave) * 8} bits")
     return mensaje_descifrado.decode()
 
-def cifrar_rsa_oaep(mensaje, public_key_pem):
-    """
-    Cifra un mensaje usando RSA-OAEP y la clave pública proporcionada.
-    """
-    public_key = serialization.load_pem_public_key(base64.urlsafe_b64decode(public_key_pem))
-    cifrado = public_key.encrypt(
-        mensaje.encode(),
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
-        )
-    )
-    return base64.urlsafe_b64encode(cifrado).decode('utf-8')
-
-def descifrar_rsa_oaep(cifrado, private_key_pem, password):
-    """
-    Descifra un mensaje cifrado con RSA-OAEP usando la clave privada protegida.
-    """
-    private_key = serialization.load_pem_private_key(
-        base64.urlsafe_b64decode(private_key_pem),
-        password=password.encode()
-    )
-    mensaje = private_key.decrypt(
-        base64.urlsafe_b64decode(cifrado),
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None
-        )
-    )
-    return mensaje.decode('utf-8')
-
 
 def generar_claves_rsa(clave_sesion):
     """
